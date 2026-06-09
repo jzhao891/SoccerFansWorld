@@ -31,7 +31,13 @@ export default function LandingPage() {
         </div>
 
         <div className="mx-auto w-full max-w-sm rounded-[2rem] border border-slate-200/20 bg-slate-950/50 p-4 shadow-2xl backdrop-blur">
-          <div className="aspect-[2.5/3.5] rounded-[1.5rem] border border-emerald-200/40 bg-[radial-gradient(circle_at_50%_0%,rgba(16,185,129,0.55),transparent_38%),linear-gradient(160deg,#03101c,#0f2f46_45%,#03251d)] p-5">
+          <div className="relative aspect-[2.5/3.5] overflow-hidden rounded-[1.5rem] border border-amber-100/40 p-5">
+            <img
+              src="/stadium-bg.jpg"
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 h-full w-full object-cover"
+            />
             <div className="flex h-full flex-col justify-between rounded-[1.1rem] border border-slate-200/20 bg-white/5 p-4 text-center shadow-inner">
               <div className="space-y-2">
                 <p className="text-xs font-black uppercase tracking-[0.35em] text-emerald-100">Fan XI</p>

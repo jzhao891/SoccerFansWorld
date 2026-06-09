@@ -4,6 +4,12 @@ import { toPng } from "html-to-image";
 import Link from "next/link";
 import { ChangeEvent, forwardRef, useMemo, useRef, useState } from "react";
 
+const PLAYER_TEMPLATES = [
+  { id: "striker",    label: "Celebration", number: "10", img: "/players/striker.png" },
+  { id: "midfielder", label: "Volley",      number: "10", img: "/players/midfielder.png" },
+  { id: "defender",   label: "Dribble",     number: "10", img: "/players/defender.png" },
+];
+
 type FanStats = {
   passion: number;
   energy: number;
@@ -47,6 +53,9 @@ const statLabels: Array<[keyof FanStats, string]> = [
 
 export default function CreatePage() {
   const [photoUrl, setPhotoUrl] = useState<string>("");
+  const [compositeUrl, setCompositeUrl] = useState<string>("");
+  const [isFaceProcessing, setIsFaceProcessing] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState(PLAYER_TEMPLATES[0]);
   const [name, setName] = useState("");
   const [favoriteTeam, setFavoriteTeam] = useState("");
   const [city, setCity] = useState("");
@@ -67,20 +76,41 @@ export default function CreatePage() {
   function handlePhotoUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = () => {
       setPhotoUrl(String(reader.result));
+      setCompositeUrl("");
       setCardData(null);
     };
     reader.readAsDataURL(file);
   }
 
-  function handleGenerateCard() {
-    setCardData(MOCK_AI_RESPONSE);
-    window.setTimeout(() => {
-      document.getElementById("result-card")?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 80);
+  async function handleGenerateCard() {
+    if (!photoUrl) return;
+    setIsFaceProcessing(true);
+    setCompositeUrl("");
+    setCardData(null);
+    try {
+      const res = await fetch("/api/face-swap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          faceImageData: photoUrl,
+          playerId: selectedPlayer.id,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Face swap failed");
+      setCompositeUrl(json.imageUrl);
+      setCardData(MOCK_AI_RESPONSE);
+    } catch (err) {
+      alert(`Face swap failed: ${err}`);
+    } finally {
+      setIsFaceProcessing(false);
+      window.setTimeout(() => {
+        document.getElementById("result-card")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 80);
+    }
   }
 
   async function handleDownload() {
@@ -142,6 +172,30 @@ export default function CreatePage() {
                 ) : null}
               </label>
 
+              {/* Player template selection */}
+              <div>
+                <p className="mb-2 text-xs font-black uppercase tracking-[0.28em] text-emerald-200">Choose Player</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {PLAYER_TEMPLATES.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => { setSelectedPlayer(p); setCompositeUrl(""); setCardData(null); }}
+                      className={`relative overflow-hidden rounded-2xl border-2 transition ${
+                        selectedPlayer.id === p.id
+                          ? "border-emerald-300 shadow-[0_0_16px_rgba(52,211,153,0.4)]"
+                          : "border-white/15 hover:border-white/35"
+                      }`}
+                    >
+                      <img src={p.img} alt={p.label} className="h-24 w-full object-cover object-top" />
+                      <div className="absolute inset-x-0 bottom-0 bg-slate-950/70 py-1 text-center text-[0.6rem] font-black uppercase tracking-wide text-white">
+                        {p.label} #{p.number}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="grid gap-4">
                 <TextInput label="Name" value={name} placeholder="Maya" onChange={setName} />
                 <TextInput label="Favorite team" value={favoriteTeam} placeholder="Seattle Sounders" onChange={setFavoriteTeam} />
@@ -151,42 +205,35 @@ export default function CreatePage() {
               <button
                 type="button"
                 onClick={handleGenerateCard}
-                disabled={!photoUrl}
+                disabled={!photoUrl || isFaceProcessing}
                 className="w-full rounded-full bg-gradient-to-r from-emerald-300 via-teal-200 to-slate-100 px-7 py-4 text-sm font-black uppercase tracking-[0.22em] text-slate-950 shadow-[0_0_34px_rgba(52,211,153,0.28)] transition enabled:hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-45"
               >
-                Generate Card
+                {isFaceProcessing ? "Swapping face…" : "Generate Card"}
               </button>
             </div>
           </div>
 
           <section id="result-card" className="flex flex-col items-center gap-5">
+            <FanCard
+              ref={cardRef}
+              data={cardData}
+              compositeUrl={compositeUrl}
+              playerTemplateImg={selectedPlayer.img}
+              isFaceProcessing={isFaceProcessing}
+              name={displayName}
+              favoriteTeam={displayTeam}
+              city={displayCity}
+              overallRating={overallRating}
+            />
             {cardData ? (
-              <>
-                <FanCard
-                  ref={cardRef}
-                  data={cardData}
-                  photoUrl={photoUrl}
-                  name={displayName}
-                  favoriteTeam={displayTeam}
-                  city={displayCity}
-                  overallRating={overallRating}
-                />
-                <button
-                  type="button"
-                  onClick={handleDownload}
-                  className="rounded-full border border-emerald-200/30 bg-white px-7 py-3 text-sm font-black uppercase tracking-[0.2em] text-slate-950 shadow-xl transition hover:scale-105"
-                >
-                  {isDownloading ? "Preparing PNG..." : "Download PNG"}
-                </button>
-              </>
-            ) : (
-              <div className="flex min-h-[520px] w-full items-center justify-center rounded-[2rem] border border-white/10 bg-white/5 p-8 text-center backdrop-blur">
-                <div className="max-w-sm space-y-3">
-                  <p className="text-2xl font-black">Your card preview will appear here.</p>
-                  <p className="text-slate-300">Upload a photo and generate the mock AI card to unlock the PNG download workflow.</p>
-                </div>
-              </div>
-            )}
+              <button
+                type="button"
+                onClick={handleDownload}
+                className="rounded-full border border-emerald-200/30 bg-white px-7 py-3 text-sm font-black uppercase tracking-[0.2em] text-slate-950 shadow-xl transition hover:scale-105"
+              >
+                {isDownloading ? "Preparing PNG..." : "Download PNG"}
+              </button>
+            ) : null}
           </section>
         </section>
       </div>
@@ -219,15 +266,19 @@ function TextInput({
 }
 
 const FanCard = forwardRef<HTMLDivElement, {
-  data: AiCardResponse;
-  photoUrl: string;
+  data: AiCardResponse | null;
+  compositeUrl: string;
+  playerTemplateImg: string;
+  isFaceProcessing: boolean;
   name: string;
   favoriteTeam: string;
   city: string;
   overallRating: number;
 }>(function FanCard({
   data,
-  photoUrl,
+  compositeUrl,
+  playerTemplateImg,
+  isFaceProcessing,
   name,
   favoriteTeam,
   city,
@@ -236,64 +287,78 @@ const FanCard = forwardRef<HTMLDivElement, {
   return (
     <div
       ref={ref}
-      className="relative aspect-[2.5/3.5] w-full max-w-[390px] overflow-hidden rounded-[2rem] border-[6px] border-slate-200 bg-slate-950 p-3 shadow-[0_30px_90px_rgba(0,0,0,0.5)]"
+      className="relative aspect-[2.5/3.5] w-full max-w-[390px] overflow-hidden rounded-[1.5rem] border-4 border-white/20 bg-slate-950 shadow-[0_30px_90px_rgba(0,0,0,0.8)]"
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(52,211,153,0.6),transparent_32%),linear-gradient(160deg,#03101c_0%,#123d56_48%,#03251d_100%)]" />
-      <div className="absolute inset-x-5 top-8 h-20 rounded-full bg-emerald-100/20 blur-2xl" />
-      <div className="absolute bottom-24 left-0 h-24 w-full bg-[repeating-linear-gradient(90deg,rgba(255,255,255,0.09)_0_2px,transparent_2px_18px)] opacity-40" />
-      <div className="absolute bottom-0 left-0 h-36 w-full bg-[linear-gradient(to_top,rgba(148,163,184,0.28),transparent)] [clip-path:polygon(0_55%,18%_40%,28%_55%,42%_28%,54%_48%,67%_24%,78%_54%,90%_38%,100%_56%,100%_100%,0_100%)]" />
+      {/* Layer 1: Stadium background */}
+      <img
+        src="/stadium-bg.jpg"
+        alt=""
+        aria-hidden="true"
+        className="absolute inset-0 h-full w-full object-cover"
+      />
 
-      <div className="relative flex h-full flex-col rounded-[1.45rem] border border-white/35 bg-white/[0.07] p-4 shadow-inner">
-        <div className="mb-2 flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[0.62rem] font-black uppercase tracking-[0.34em] text-emerald-100">Fan rating</p>
-            <h2 className="mt-1 text-2xl font-black uppercase leading-none tracking-tight text-white">{data.archetype}</h2>
-          </div>
-          <div className="rounded-2xl border border-emerald-100/40 bg-slate-950/70 px-3 py-2 text-center shadow-lg">
-            <p className="text-4xl font-black leading-none text-emerald-200">{overallRating}</p>
-            <p className="text-[0.58rem] font-black uppercase tracking-[0.22em] text-slate-300">OVR</p>
-          </div>
+      {/* Layer 2: Subtle gradient darkening at top and bottom for text legibility */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,0.55)_0%,transparent_35%,transparent_55%,rgba(0,0,0,0.72)_100%)]" />
+
+      {/* Layer 3: Player image — template shown by default, swapped result after generation */}
+      <img
+        src={compositeUrl || playerTemplateImg}
+        alt=""
+        aria-hidden="true"
+        className="absolute inset-x-0 bottom-[18%] h-[72%] w-full object-contain object-bottom"
+        style={{ mixBlendMode: "multiply" }}
+      />
+      {isFaceProcessing && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/30 text-slate-200">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-300 border-t-transparent" />
+          <p className="text-xs font-bold uppercase tracking-widest">Swapping face…</p>
+        </div>
+      )}
+
+      {/* Layer 4: Top banner — "FAN XI" + OVR */}
+      <div className="absolute inset-x-0 top-0 flex items-start justify-between px-4 pt-3">
+        <div>
+          <p className="text-[0.55rem] font-black uppercase tracking-[0.35em] text-emerald-300 drop-shadow">Fan XI</p>
+          <p className="text-[0.65rem] font-black uppercase tracking-[0.2em] text-white/80 drop-shadow">
+            {data ? data.archetype : "Soccer Stars"}
+          </p>
+        </div>
+        {/* OVR badge */}
+        <div className="rounded-xl bg-black/50 px-2.5 py-1.5 text-center backdrop-blur-sm border border-white/10">
+          <p className="text-2xl font-black leading-none text-emerald-300 drop-shadow">
+            {data ? overallRating : "—"}
+          </p>
+          <p className="text-[0.5rem] font-black uppercase tracking-widest text-slate-300">OVR</p>
+        </div>
+      </div>
+
+      {/* Layer 5: Bottom — name + 6 stats bar */}
+      <div className="absolute inset-x-0 bottom-0 px-3 pb-3">
+        {/* Name */}
+        <div className="mb-2 text-center">
+          <p className="text-[0.55rem] font-black uppercase tracking-[0.3em] text-emerald-300 drop-shadow">
+            {favoriteTeam} • {city}
+          </p>
+          <p className="text-2xl font-black uppercase leading-tight tracking-wide text-white drop-shadow-lg">
+            {name}
+          </p>
         </div>
 
-        <div className="relative mb-3 min-h-0 flex-1 overflow-hidden rounded-[1.15rem] border border-slate-100/30 bg-slate-950/50">
-          {photoUrl ? (
-            <img src={photoUrl} alt={`${name} fan card photo`} className="h-full w-full object-cover" />
-          ) : null}
-          <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(2,6,23,0.88),transparent_58%,rgba(5,150,105,0.18))]" />
-          <div className="absolute bottom-3 left-3 right-3">
-            <p className="text-3xl font-black uppercase leading-none tracking-tight drop-shadow-lg">{name}</p>
-            <p className="mt-1 text-xs font-bold uppercase tracking-[0.22em] text-emerald-100">{favoriteTeam} • {city}</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
+        {/* Stats strip */}
+        <div className="grid grid-cols-6 gap-1">
           {statLabels.map(([key, label]) => (
-            <div key={key} className="rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-slate-300">{label}</span>
-                <span className="text-sm font-black text-emerald-100">{data.stats[key]}</span>
-              </div>
-              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-700">
-                <div className="h-full rounded-full bg-gradient-to-r from-emerald-300 to-slate-100" style={{ width: `${data.stats[key]}%` }} />
-              </div>
+            <div
+              key={key}
+              className="rounded-lg bg-black/55 py-1.5 text-center backdrop-blur-sm border border-white/10"
+            >
+              <p className="text-sm font-black leading-none text-white">
+                {data ? data.stats[key] : "—"}
+              </p>
+              <p className="mt-0.5 text-[0.45rem] font-bold uppercase tracking-wide text-slate-300">
+                {label.slice(0, 3)}
+              </p>
             </div>
           ))}
-        </div>
-
-        <div className="mt-3 rounded-2xl border border-emerald-100/25 bg-emerald-950/65 p-3">
-          <div className="grid grid-cols-2 gap-3 text-[0.66rem] leading-4">
-            <div>
-              <p className="font-black uppercase tracking-[0.2em] text-emerald-200">Special Ability</p>
-              <p className="mt-1 font-bold text-white">{data.specialAbility}</p>
-            </div>
-            <div>
-              <p className="font-black uppercase tracking-[0.2em] text-slate-300">Weakness</p>
-              <p className="mt-1 font-bold text-white">{data.weakness}</p>
-            </div>
-          </div>
-          <p className="mt-2 border-t border-white/10 pt-2 text-center text-xs font-semibold italic text-slate-100">
-            “{data.description}”
-          </p>
         </div>
       </div>
     </div>
