@@ -1,7 +1,7 @@
 'use client';
 
-import { useRef, useCallback, useMemo } from 'react';
-import Map, { Source, Layer, type MapRef, type ViewStateChangeEvent } from 'react-map-gl/mapbox';
+import { useRef, useCallback, useMemo, type ReactNode } from 'react';
+import Map, { Source, Layer, type MapRef, type ViewStateChangeEvent, type MapEvent } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import type { BoundingBox } from '@sfw/shared';
 import { ALLOWED_REGIONS } from '@sfw/shared';
@@ -19,17 +19,18 @@ const SEATTLE: { longitude: number; latitude: number; zoom: number } = {
 
 interface MapViewProps {
   onBoundsChange?: (bounds: BoundingBox) => void;
+  children?: ReactNode;
 }
 
-export default function MapView({ onBoundsChange }: MapViewProps) {
+export default function MapView({ onBoundsChange, children }: MapViewProps) {
   const mapRef = useRef<MapRef>(null);
 
   const fogGeoJSON = useMemo(() => buildFogGeoJSON(ALLOWED_REGIONS), []);
 
-  const handleMoveEnd = useCallback(
-    (e: ViewStateChangeEvent) => {
+  const fireBoundsChange = useCallback(
+    (map: mapboxgl.Map) => {
       if (!onBoundsChange) return;
-      const bounds = e.target.getBounds();
+      const bounds = map.getBounds();
       if (!bounds) return;
       onBoundsChange({
         north: bounds.getNorth(),
@@ -41,6 +42,16 @@ export default function MapView({ onBoundsChange }: MapViewProps) {
     [onBoundsChange],
   );
 
+  const handleLoad = useCallback(
+    (e: MapEvent) => fireBoundsChange(e.target),
+    [fireBoundsChange],
+  );
+
+  const handleMoveEnd = useCallback(
+    (e: ViewStateChangeEvent) => fireBoundsChange(e.target),
+    [fireBoundsChange],
+  );
+
   return (
     <Map
       ref={mapRef}
@@ -48,6 +59,7 @@ export default function MapView({ onBoundsChange }: MapViewProps) {
       style={{ width: '100%', height: '100%' }}
       mapStyle={MAP_STYLE}
       mapboxAccessToken={MAPBOX_TOKEN}
+      onLoad={handleLoad}
       onMoveEnd={handleMoveEnd}
     >
       <Source id="fog" type="geojson" data={fogGeoJSON}>
@@ -60,6 +72,7 @@ export default function MapView({ onBoundsChange }: MapViewProps) {
           }}
         />
       </Source>
+      {children}
     </Map>
   );
 }
