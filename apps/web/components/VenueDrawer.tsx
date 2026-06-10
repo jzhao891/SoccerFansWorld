@@ -135,7 +135,7 @@ export default function VenueDrawer() {
                 {liveStatus.crowd_index && (
                   <div>
                     <p className="text-xs text-gray-500 mb-0.5">Crowd</p>
-                    <p className="font-medium">
+                    <p className="font-medium text-gray-900">
                       {CROWD_EMOJI[liveStatus.crowd_index]} {liveStatus.crowd_index}
                     </p>
                   </div>
@@ -143,13 +143,13 @@ export default function VenueDrawer() {
                 {liveStatus.sound && (
                   <div>
                     <p className="text-xs text-gray-500 mb-0.5">Sound</p>
-                    <p className="font-medium">{liveStatus.sound === 'On' ? '🔊 On' : '🔇 Off'}</p>
+                    <p className="font-medium text-gray-900">{liveStatus.sound === 'On' ? '🔊 On' : '🔇 Off'}</p>
                   </div>
                 )}
                 {liveStatus.fan_ratio && (
                   <div>
                     <p className="text-xs text-gray-500 mb-0.5">Fan ratio</p>
-                    <p className="font-medium">{liveStatus.fan_ratio}</p>
+                    <p className="font-medium text-gray-900">{liveStatus.fan_ratio}</p>
                   </div>
                 )}
               </div>
@@ -164,38 +164,38 @@ export default function VenueDrawer() {
 
                 <p className="text-xs text-gray-500 mb-2">How&apos;s the crowd?</p>
                 <div className="flex gap-2 mb-4">
-                  {CROWD_OPTIONS.map((option) => (
-                    <button
-                      key={option}
-                      onClick={() => checkIn({ crowd_index: option })}
-                      disabled={saving}
-                      className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                        liveStatus?.crowd_index === option
-                          ? 'bg-gray-900 text-white border-gray-900'
-                          : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
-                      }`}
-                    >
-                      {CROWD_EMOJI[option!]} {option}
-                    </button>
-                  ))}
+                  {CROWD_OPTIONS.map((option) => {
+                    const selected = liveStatus?.crowd_index === option;
+                    return (
+                      <button
+                        key={option}
+                        onClick={() => checkIn({ crowd_index: option })}
+                        disabled={saving}
+                        style={{ backgroundColor: selected ? '#111827' : '#fff', color: selected ? '#fff' : '#374151' }}
+                        className="flex-1 py-1.5 rounded-lg text-xs font-medium border border-gray-200 transition-colors"
+                      >
+                        {CROWD_EMOJI[option!]} {option}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <p className="text-xs text-gray-500 mb-2">Sound on?</p>
                 <div className="flex gap-2">
-                  {(['On', 'Off'] as const).map((option) => (
+                  {(['On', 'Off'] as const).map((option) => {
+                    const selected = liveStatus?.sound === option;
+                    return (
                     <button
                       key={option}
                       onClick={() => checkIn({ sound: option })}
                       disabled={saving}
-                      className={`px-4 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                        liveStatus?.sound === option
-                          ? 'bg-gray-900 text-white border-gray-900'
-                          : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
-                      }`}
+                      style={{ backgroundColor: selected ? '#111827' : '#fff', color: selected ? '#fff' : '#374151' }}
+                      className="px-4 py-1.5 rounded-lg text-xs font-medium border border-gray-200 transition-colors"
                     >
                       {option === 'On' ? '🔊 On' : '🔇 Off'}
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
