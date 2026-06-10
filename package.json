@@ -6,7 +6,7 @@
     "dev": "node scripts/dev-server.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "dev:next": "next dev"
   },
   "dependencies": {
@@ -23,6 +23,8 @@
     "@types/node": "^20.14.10",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^15.3.3",
     "tailwindcss": "^4.1.8",
     "typescript": "^5.4.5"
   }
