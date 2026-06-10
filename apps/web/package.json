@@ -14,12 +14,18 @@
     "@gradio/client": "^2.2.1",
     "@tailwindcss/postcss": "^4.1.8",
     "face-api.js": "^0.22.2",
+    "firebase": "^12.14.0",
+    "geofire-common": "^6.0.0",
     "html-to-image": "^1.11.13",
+    "mapbox-gl": "^3.24.0",
     "next": "^15.3.3",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-map-gl": "^8.1.1",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@types/mapbox-gl": "^3.4.1",
     "@types/node": "^20.14.10",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
