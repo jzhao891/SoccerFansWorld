@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { PlaceResult, PlacesRequest, PlacesResponse, PlacesErrorResponse } from '@sfw/shared';
 
 const PLACES_API_BASE = 'https://places.googleapis.com/v1/places:searchNearby';
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<NextResponse<PlacesResponse | PlacesErrorResponse>> {
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: 'Places API key not configured' }, { status: 500 });
   }
 
-  const { lat, lng, radiusMeters = 2000 } = await req.json();
+  const { lat, lng, radiusMeters = 2000 }: PlacesRequest = await req.json();
   if (typeof lat !== 'number' || typeof lng !== 'number') {
     return NextResponse.json({ error: 'lat and lng are required' }, { status: 400 });
   }
@@ -42,19 +43,18 @@ export async function POST(req: NextRequest) {
 
   const data = await res.json();
 
-  // Normalize to PlaceResult shape
   const places = (data.places ?? []).map((p: Record<string, unknown>) => {
     const loc = p.location as { latitude: number; longitude: number } | undefined;
     const display = p.displayName as { text?: string } | undefined;
     return {
-      place_id: p.id,
+      place_id: p.id as string,
       name: display?.text ?? '',
       location: { lat: loc?.latitude ?? 0, lng: loc?.longitude ?? 0 },
       types: (p.types as string[]) ?? [],
-      vicinity: p.formattedAddress ?? '',
-      rating: p.rating ?? null,
-      open_now: (p.currentOpeningHours as { openNow?: boolean } | undefined)?.openNow ?? null,
-    };
+      vicinity: p.formattedAddress as string | undefined,
+      rating: p.rating as number | undefined,
+      open_now: (p.currentOpeningHours as { openNow?: boolean } | undefined)?.openNow,
+    } satisfies PlaceResult;
   });
 
   return NextResponse.json({ places });

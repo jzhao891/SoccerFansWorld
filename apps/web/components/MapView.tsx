@@ -1,13 +1,15 @@
 'use client';
 
-import { useRef, useCallback } from 'react';
-import Map, { type MapRef, type ViewStateChangeEvent } from 'react-map-gl/mapbox';
+import { useRef, useCallback, useMemo } from 'react';
+import Map, { Source, Layer, type MapRef, type ViewStateChangeEvent } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import type { BoundingBox } from '@sfw/shared';
+import { ALLOWED_REGIONS } from '@sfw/shared';
+import { buildFogGeoJSON } from '@/lib/fogLayer';
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
 
-const MAP_STYLE = 'mapbox://styles/mapbox/dark-v11';
+const MAP_STYLE = 'mapbox://styles/mapbox/streets-v12';
 
 const SEATTLE: { longitude: number; latitude: number; zoom: number } = {
   longitude: -122.3321,
@@ -21,6 +23,8 @@ interface MapViewProps {
 
 export default function MapView({ onBoundsChange }: MapViewProps) {
   const mapRef = useRef<MapRef>(null);
+
+  const fogGeoJSON = useMemo(() => buildFogGeoJSON(ALLOWED_REGIONS), []);
 
   const handleMoveEnd = useCallback(
     (e: ViewStateChangeEvent) => {
@@ -45,6 +49,17 @@ export default function MapView({ onBoundsChange }: MapViewProps) {
       mapStyle={MAP_STYLE}
       mapboxAccessToken={MAPBOX_TOKEN}
       onMoveEnd={handleMoveEnd}
-    />
+    >
+      <Source id="fog" type="geojson" data={fogGeoJSON}>
+        <Layer
+          id="fog-fill"
+          type="fill"
+          paint={{
+            'fill-color': '#000000',
+            'fill-opacity': 0.7,
+          }}
+        />
+      </Source>
+    </Map>
   );
 }
