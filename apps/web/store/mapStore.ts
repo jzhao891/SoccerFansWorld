@@ -20,6 +20,7 @@ interface MapState {
   setPlaces: (places: PlaceResult[]) => void;
   setFanZones: (fanZones: FanZone[]) => void;
   setLiveStatus: (status: LiveStatus) => void;
+  removeLiveStatus: (venueId: string) => void;
   setIsProgrammaticMove: (value: boolean) => void;
 }
 
@@ -39,5 +40,10 @@ export const useMapStore = create<MapState>((set) => ({
     set((state) => ({
       liveStatuses: { ...state.liveStatuses, [status.venue_id]: status },
     })),
+  removeLiveStatus: (venueId) =>
+    set((state) => {
+      const { [venueId]: _, ...rest } = state.liveStatuses;
+      return { liveStatuses: rest };
+    }),
   setIsProgrammaticMove: (value) => set({ isProgrammaticMove: value }),
 }));
