@@ -3,13 +3,13 @@ import { swapFace } from "@/lib/faceSwapProviders";
 
 export async function POST(req: NextRequest) {
   try {
-    const { faceImageData, playerId } = await req.json();
+    const { faceImageData, teamId, poseId } = await req.json();
 
-    if (!faceImageData || !playerId) {
-      return NextResponse.json({ error: "Missing faceImageData or playerId" }, { status: 400 });
+    if (!faceImageData || !teamId || !poseId) {
+      return NextResponse.json({ error: "Missing faceImageData, teamId, or poseId" }, { status: 400 });
     }
 
-    const imageUrl = await swapFace(faceImageData, playerId);
+    const imageUrl = await swapFace(faceImageData, teamId, poseId);
     const provider = process.env.FACE_SWAP_PROVIDER ?? "huggingface";
 
     return NextResponse.json({ imageUrl, provider });

@@ -4,11 +4,19 @@ import { toPng } from "html-to-image";
 import Link from "next/link";
 import { ChangeEvent, forwardRef, useMemo, useRef, useState } from "react";
 
-const PLAYER_TEMPLATES = [
-  { id: "striker",    label: "Celebration", number: "10", img: "/players/striker.png" },
-  { id: "midfielder", label: "Volley",      number: "10", img: "/players/midfielder.png" },
-  { id: "defender",   label: "Dribble",     number: "10", img: "/players/defender.png" },
+const POSES = [
+  { id: "celebration", label: "Celebration" },
+  { id: "volley",      label: "Volley" },
+  { id: "dribble",     label: "Dribble" },
 ];
+
+// 2026 World Cup teams. To add a team, drop three pose images into
+// /public/players/{id}/{celebration,volley,dribble}.png and add a row here.
+const TEAMS = [
+  { id: "nigeria", name: "Nigeria", flag: "🇳🇬", accent: "#16a34a" },
+];
+
+const teamPoseImg = (teamId: string, poseId: string) => `/players/${teamId}/${poseId}.png`;
 
 type FanStats = {
   passion: number;
@@ -55,16 +63,17 @@ export default function CreatePage() {
   const [photoUrl, setPhotoUrl] = useState<string>("");
   const [compositeUrl, setCompositeUrl] = useState<string>("");
   const [isFaceProcessing, setIsFaceProcessing] = useState(false);
-  const [selectedPlayer, setSelectedPlayer] = useState(PLAYER_TEMPLATES[0]);
+  const [selectedTeam, setSelectedTeam] = useState(TEAMS[0]);
+  const [selectedPose, setSelectedPose] = useState(POSES[0]);
   const [name, setName] = useState("");
-  const [favoriteTeam, setFavoriteTeam] = useState("");
   const [city, setCity] = useState("");
   const [cardData, setCardData] = useState<AiCardResponse | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   const displayName = name.trim() || "Emerald Regular";
-  const displayTeam = favoriteTeam.trim() || "Seattle FC";
+  const displayTeam = selectedTeam.name;
   const displayCity = city.trim() || "Seattle";
 
   const overallRating = useMemo(() => {
@@ -96,7 +105,8 @@ export default function CreatePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           faceImageData: photoUrl,
-          playerId: selectedPlayer.id,
+          teamId: selectedTeam.id,
+          poseId: selectedPose.id,
         }),
       });
       const json = await res.json();
@@ -113,18 +123,26 @@ export default function CreatePage() {
     }
   }
 
-  async function handleDownload() {
+  // Free download: low resolution, watermark stays baked in (watermark is in the DOM)
+  // HD download: only for premium — clean (watermark hidden) and high resolution
+  async function handleDownload(hd: boolean) {
     if (!cardRef.current) return;
+
+    if (hd && !isPremium) {
+      alert("HD download without watermark is a Premium feature. Unlock to remove the watermark and export full resolution.");
+      return;
+    }
 
     setIsDownloading(true);
     try {
       const dataUrl = await toPng(cardRef.current, {
         cacheBust: true,
-        pixelRatio: 3,
+        pixelRatio: hd ? 3 : 1, // free = low-res, premium = high-res
         backgroundColor: "#061521",
       });
+      const suffix = hd ? "hd" : "preview";
       const link = document.createElement("a");
-      link.download = `${displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-fan-card.png`;
+      link.download = `${displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-fan-card-${suffix}.png`;
       link.href = dataUrl;
       link.click();
     } finally {
@@ -172,24 +190,50 @@ export default function CreatePage() {
                 ) : null}
               </label>
 
-              {/* Player template selection */}
+              {/* Team selection */}
               <div>
-                <p className="mb-2 text-xs font-black uppercase tracking-[0.28em] text-emerald-200">Choose Player</p>
+                <p className="mb-2 text-xs font-black uppercase tracking-[0.28em] text-emerald-200">Choose Team</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {TEAMS.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => { setSelectedTeam(t); setCompositeUrl(""); setCardData(null); }}
+                      className={`flex flex-col items-center gap-1 rounded-2xl border-2 px-1 py-2 transition ${
+                        selectedTeam.id === t.id
+                          ? "border-emerald-300 bg-emerald-300/10 shadow-[0_0_16px_rgba(52,211,153,0.4)]"
+                          : "border-white/15 hover:border-white/35"
+                      }`}
+                    >
+                      <span className="text-2xl leading-none">{t.flag}</span>
+                      <span className="text-[0.55rem] font-black uppercase tracking-wide text-white">{t.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Pose selection */}
+              <div>
+                <p className="mb-2 text-xs font-black uppercase tracking-[0.28em] text-emerald-200">Choose Pose</p>
                 <div className="grid grid-cols-3 gap-2">
-                  {PLAYER_TEMPLATES.map((p) => (
+                  {POSES.map((p) => (
                     <button
                       key={p.id}
                       type="button"
-                      onClick={() => { setSelectedPlayer(p); setCompositeUrl(""); setCardData(null); }}
+                      onClick={() => { setSelectedPose(p); setCompositeUrl(""); setCardData(null); }}
                       className={`relative overflow-hidden rounded-2xl border-2 transition ${
-                        selectedPlayer.id === p.id
+                        selectedPose.id === p.id
                           ? "border-emerald-300 shadow-[0_0_16px_rgba(52,211,153,0.4)]"
                           : "border-white/15 hover:border-white/35"
                       }`}
                     >
-                      <img src={p.img} alt={p.label} className="h-24 w-full object-cover object-top" />
+                      <img
+                        src={teamPoseImg(selectedTeam.id, p.id)}
+                        alt={p.label}
+                        className="h-24 w-full object-contain object-bottom"
+                      />
                       <div className="absolute inset-x-0 bottom-0 bg-slate-950/70 py-1 text-center text-[0.6rem] font-black uppercase tracking-wide text-white">
-                        {p.label} #{p.number}
+                        {p.label}
                       </div>
                     </button>
                   ))}
@@ -198,7 +242,6 @@ export default function CreatePage() {
 
               <div className="grid gap-4">
                 <TextInput label="Name" value={name} placeholder="Maya" onChange={setName} />
-                <TextInput label="Favorite team" value={favoriteTeam} placeholder="Seattle Sounders" onChange={setFavoriteTeam} />
                 <TextInput label="City" value={city} placeholder="Seattle" onChange={setCity} />
               </div>
 
@@ -218,21 +261,49 @@ export default function CreatePage() {
               ref={cardRef}
               data={cardData}
               compositeUrl={compositeUrl}
-              playerTemplateImg={selectedPlayer.img}
+              playerTemplateImg={teamPoseImg(selectedTeam.id, selectedPose.id)}
               isFaceProcessing={isFaceProcessing}
+              showWatermark={!isPremium}
               name={displayName}
               favoriteTeam={displayTeam}
               city={displayCity}
               overallRating={overallRating}
             />
             {cardData ? (
-              <button
-                type="button"
-                onClick={handleDownload}
-                className="rounded-full border border-emerald-200/30 bg-white px-7 py-3 text-sm font-black uppercase tracking-[0.2em] text-slate-950 shadow-xl transition hover:scale-105"
-              >
-                {isDownloading ? "Preparing PNG..." : "Download PNG"}
-              </button>
+              <div className="flex flex-col items-center gap-3">
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleDownload(false)}
+                    disabled={isDownloading}
+                    className="rounded-full border border-white/20 bg-white/10 px-6 py-3 text-sm font-black uppercase tracking-[0.2em] text-white backdrop-blur transition hover:bg-white/15 disabled:opacity-50"
+                  >
+                    {isDownloading ? "Preparing…" : "Download (Free)"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDownload(true)}
+                    disabled={isDownloading}
+                    className="flex items-center gap-2 rounded-full border border-emerald-200/30 bg-gradient-to-r from-emerald-300 to-teal-200 px-6 py-3 text-sm font-black uppercase tracking-[0.2em] text-slate-950 shadow-xl transition hover:scale-105 disabled:opacity-50"
+                  >
+                    {!isPremium && <span aria-hidden>🔒</span>}
+                    Download HD
+                  </button>
+                </div>
+                <p className="text-center text-xs text-slate-400">
+                  {isPremium
+                    ? "Premium unlocked — HD export, no watermark."
+                    : "Free version is watermarked and low-resolution."}
+                  {" "}
+                  <button
+                    type="button"
+                    onClick={() => setIsPremium((v) => !v)}
+                    className="font-bold text-emerald-300 underline underline-offset-2"
+                  >
+                    {isPremium ? "Lock again (demo)" : "Unlock Premium (demo)"}
+                  </button>
+                </p>
+              </div>
             ) : null}
           </section>
         </section>
@@ -270,6 +341,7 @@ const FanCard = forwardRef<HTMLDivElement, {
   compositeUrl: string;
   playerTemplateImg: string;
   isFaceProcessing: boolean;
+  showWatermark: boolean;
   name: string;
   favoriteTeam: string;
   city: string;
@@ -279,6 +351,7 @@ const FanCard = forwardRef<HTMLDivElement, {
   compositeUrl,
   playerTemplateImg,
   isFaceProcessing,
+  showWatermark,
   name,
   favoriteTeam,
   city,
@@ -300,13 +373,12 @@ const FanCard = forwardRef<HTMLDivElement, {
       {/* Layer 2: Subtle gradient darkening at top and bottom for text legibility */}
       <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,0.55)_0%,transparent_35%,transparent_55%,rgba(0,0,0,0.72)_100%)]" />
 
-      {/* Layer 3: Player image — template shown by default, swapped result after generation */}
+      {/* Layer 3: Player image (transparent PNG) — sits directly on the stadium */}
       <img
         src={compositeUrl || playerTemplateImg}
         alt=""
         aria-hidden="true"
-        className="absolute inset-x-0 bottom-[18%] h-[72%] w-full object-contain object-bottom"
-        style={{ mixBlendMode: "multiply" }}
+        className="absolute inset-x-0 bottom-[18%] h-[72%] w-full object-contain object-bottom drop-shadow-[0_10px_20px_rgba(0,0,0,0.55)]"
       />
       {isFaceProcessing && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/30 text-slate-200">
@@ -361,6 +433,22 @@ const FanCard = forwardRef<HTMLDivElement, {
           ))}
         </div>
       </div>
+
+      {/* Layer 6: Tiled diagonal watermark — survives screenshots, baked into free export */}
+      {showWatermark && (
+        <div className="pointer-events-none absolute inset-0 z-30 overflow-hidden">
+          <div className="absolute -inset-1/4 flex flex-wrap content-center justify-center gap-x-5 gap-y-9 rotate-[-30deg] opacity-[0.16]">
+            {Array.from({ length: 60 }).map((_, i) => (
+              <span
+                key={i}
+                className="whitespace-nowrap text-[10px] font-black uppercase tracking-[0.25em] text-white"
+              >
+                SoccerFansWorld
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 });
