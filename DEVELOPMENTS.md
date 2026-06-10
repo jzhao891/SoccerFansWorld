@@ -36,9 +36,27 @@ Open http://localhost:3000
 cd apps/web && npm run lint
 ```
 
+### Run Tests
+
+```bash
+cd apps/web && npm run test
+```
+
+### Run Tests (watch mode)
+
+```bash
+cd apps/web && npm run test:watch
+```
+
 ---
 
 ## Mobile (`apps/mobile`)
+
+### Run Tests
+
+```bash
+cd apps/mobile && npm run test
+```
 
 ### Verify Build (no device needed)
 
