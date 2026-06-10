@@ -43,7 +43,12 @@ export function useMergedPlaces(): MergedPlace[] {
           fanZone,
         });
       }
-      // else: has google_place_id but Places didn't return it — skip until user zooms in closer
+      // else: FanZone has a google_place_id but Google Places didn't return it in this search.
+      // This means the venue exists in Google but was outside the 2km radius or deprioritized
+      // in the 20-result cap. Showing it as 'custom' here would be misleading — it would cause
+      // the same pin to flicker between 'merged' and 'custom' as the user zooms in and out.
+      // We skip it and let it appear correctly as 'merged' once the user zooms in close enough
+      // for Places to include it. See docs/MAP_DESIGN_DECISION_PTS.md for full rationale.
     }
 
     return Array.from(merged.values());
