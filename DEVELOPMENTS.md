@@ -6,22 +6,61 @@
 npm install
 ```
 
-## Verify Build
+## Build All (Web + Mobile)
 
 ```bash
-npm run build
+npx turbo build
 ```
 
-## Run Dev Server
+---
+
+## Web (`apps/web`)
+
+### Verify Build
 
 ```bash
-npm run dev
+cd apps/web && npm run build
+```
+
+### Run Dev Server
+
+```bash
+cd apps/web && npm run dev
 ```
 
 Open http://localhost:3000
 
-## Lint
+### Lint
 
 ```bash
-npm run lint
+cd apps/web && npm run lint
+```
+
+---
+
+## Mobile (`apps/mobile`)
+
+### Verify Build (no device needed)
+
+```bash
+cd apps/mobile && npx expo export --platform ios
+cd apps/mobile && npx expo export --platform android
+```
+
+### Run Dev Server (universal — scan QR with Expo Go on any device)
+
+```bash
+cd apps/mobile && npm run start
+```
+
+### Run on iOS Simulator (Mac + Xcode required, auto-launches simulator)
+
+```bash
+cd apps/mobile && npm run ios
+```
+
+### Run on Android Emulator (Android Studio required)
+
+```bash
+cd apps/mobile && npm run android
 ```
