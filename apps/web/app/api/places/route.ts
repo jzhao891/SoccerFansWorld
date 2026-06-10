@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { PlaceResult, PlacesRequest, PlacesResponse, PlacesErrorResponse } from '@sfw/shared';
+import { MOCK_SEATTLE_PLACES } from '@/lib/mockPlacesData';
 
 const PLACES_API_BASE = 'https://places.googleapis.com/v1/places:searchNearby';
 
 export async function POST(req: NextRequest): Promise<NextResponse<PlacesResponse | PlacesErrorResponse>> {
+  if (process.env.MOCK_PLACES === 'true') {
+    return NextResponse.json({ places: MOCK_SEATTLE_PLACES });
+  }
+
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: 'Places API key not configured' }, { status: 500 });
