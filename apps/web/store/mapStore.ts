@@ -14,6 +14,7 @@ interface MapState {
   fanZones: FanZone[];
   liveStatuses: Record<string, LiveStatus>;
   isProgrammaticMove: boolean;
+  selectedPlaceId: string | null;
 
   setViewState: (vs: ViewState) => void;
   setBounds: (bounds: BoundingBox) => void;
@@ -22,6 +23,7 @@ interface MapState {
   setLiveStatus: (status: LiveStatus) => void;
   removeLiveStatus: (venueId: string) => void;
   setIsProgrammaticMove: (value: boolean) => void;
+  setSelectedPlaceId: (id: string | null) => void;
 }
 
 export const useMapStore = create<MapState>((set) => ({
@@ -31,6 +33,7 @@ export const useMapStore = create<MapState>((set) => ({
   fanZones: [],
   liveStatuses: {},
   isProgrammaticMove: false,
+  selectedPlaceId: null,
 
   setViewState: (vs) => set({ viewState: vs }),
   setBounds: (bounds) => set({ bounds }),
@@ -46,4 +49,5 @@ export const useMapStore = create<MapState>((set) => ({
       return { liveStatuses: rest };
     }),
   setIsProgrammaticMove: (value) => set({ isProgrammaticMove: value }),
+  setSelectedPlaceId: (id) => set({ selectedPlaceId: id }),
 }));
