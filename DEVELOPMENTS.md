@@ -25,7 +25,8 @@ cd apps/web && npm run build
 ### Run Dev Server
 
 ```bash
-cd apps/web && npm run dev
+lsof -ti :3000 | xargs kill -9 2>/dev/null; echo "done"
+cd apps/web && npm run dev:next
 ```
 
 Open http://localhost:3000
