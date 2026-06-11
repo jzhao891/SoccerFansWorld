@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import MapMarkers from '@/components/MapMarkers';
 import VenueDrawer from '@/components/VenueDrawer';
+import TeamFilterBar from '@/components/TeamFilterBar';
 import { useMapStore } from '@/store/mapStore';
 import { useVenueSubscription } from '@/hooks/useVenueSubscription';
 import { usePlacesSearch } from '@/hooks/usePlacesSearch';
@@ -20,6 +21,7 @@ export default function MapPage() {
 
   return (
     <main className="w-screen h-screen relative">
+      <TeamFilterBar />
       <MapView onBoundsChange={handleBoundsChange}>
         <MapMarkers />
       </MapView>
