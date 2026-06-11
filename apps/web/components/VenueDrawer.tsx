@@ -16,7 +16,11 @@ const CROWD_EMOJI: Record<string, string> = {
   Wild: '🦁',
 };
 
-export default function VenueDrawer() {
+interface Props {
+  onCreateParty?: (location: { lat: number; lng: number }) => void;
+}
+
+export default function VenueDrawer({ onCreateParty }: Props) {
   const selectedPlaceId = useMapStore((s) => s.selectedPlaceId);
   const setSelectedPlaceId = useMapStore((s) => s.setSelectedPlaceId);
   const liveStatuses = useMapStore((s) => s.liveStatuses);
@@ -105,6 +109,16 @@ export default function VenueDrawer() {
                   <p className="text-sm font-semibold text-gray-700 mb-1">
                     📺 {place.fanZone.event_title}
                   </p>
+                  {place.fanZone.kickoff_time > 0 && (
+                    <p className="text-xs text-gray-500 mb-2">
+                      🕐 {new Date(place.fanZone.kickoff_time).toLocaleString(undefined, {
+                        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+                      })}
+                    </p>
+                  )}
+                  {place.fanZone.description && (
+                    <p className="text-xs text-gray-500 mb-2 italic">{place.fanZone.description}</p>
+                  )}
                   {place.fanZone.watching_teams.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {place.fanZone.watching_teams.map((team) => (
@@ -154,6 +168,18 @@ export default function VenueDrawer() {
                     <p className="font-medium text-gray-900">{liveStatus.fan_ratio}</p>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Create watch party */}
+            {onCreateParty && (
+              <div className="border-t pt-4 mb-2">
+                <button
+                  onClick={() => { onCreateParty(place.location); setSelectedPlaceId(null); }}
+                  className="w-full py-3 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2"
+                >
+                  🎉 Create watch party here
+                </button>
               </div>
             )}
 

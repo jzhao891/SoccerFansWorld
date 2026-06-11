@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useCallback, useMemo, useEffect, type ReactNode } from 'react';
-import Map, { Source, Layer, type MapRef, type ViewStateChangeEvent, type MapEvent } from 'react-map-gl/mapbox';
+import Map, { Source, Layer, type MapRef, type ViewStateChangeEvent, type MapEvent, type MapMouseEvent } from 'react-map-gl/mapbox';
 import { useMapStore } from '@/store/mapStore';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import type { BoundingBox } from '@sfw/shared';
@@ -18,12 +18,18 @@ const SEATTLE: { longitude: number; latitude: number; zoom: number } = {
   zoom: 13,
 };
 
+export interface MapClickPayload {
+  lngLat: { lat: number; lng: number };
+  point: { x: number; y: number };
+}
+
 interface MapViewProps {
   onBoundsChange?: (bounds: BoundingBox) => void;
+  onMapClick?: (payload: MapClickPayload) => void;
   children?: ReactNode;
 }
 
-export default function MapView({ onBoundsChange, children }: MapViewProps) {
+export default function MapView({ onBoundsChange, onMapClick, children }: MapViewProps) {
   const mapRef = useRef<MapRef>(null);
   const flyToTarget = useMapStore((s) => s.flyToTarget);
   const setFlyToTarget = useMapStore((s) => s.setFlyToTarget);
@@ -65,6 +71,14 @@ export default function MapView({ onBoundsChange, children }: MapViewProps) {
     [fireBoundsChange],
   );
 
+  const handleClick = useCallback(
+    (e: MapMouseEvent) => {
+      if (!onMapClick) return;
+      onMapClick({ lngLat: { lat: e.lngLat.lat, lng: e.lngLat.lng }, point: { x: e.point.x, y: e.point.y } });
+    },
+    [onMapClick],
+  );
+
   return (
     <Map
       ref={mapRef}
@@ -74,6 +88,7 @@ export default function MapView({ onBoundsChange, children }: MapViewProps) {
       mapboxAccessToken={MAPBOX_TOKEN}
       onLoad={handleLoad}
       onMoveEnd={handleMoveEnd}
+      onClick={handleClick}
     >
       <Source id="fog" type="geojson" data={fogGeoJSON}>
         <Layer
