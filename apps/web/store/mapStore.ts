@@ -15,6 +15,7 @@ interface MapState {
   liveStatuses: Record<string, LiveStatus>;
   isProgrammaticMove: boolean;
   selectedPlaceId: string | null;
+  selectedTeam: string | null;
 
   setViewState: (vs: ViewState) => void;
   setBounds: (bounds: BoundingBox) => void;
@@ -24,6 +25,7 @@ interface MapState {
   removeLiveStatus: (venueId: string) => void;
   setIsProgrammaticMove: (value: boolean) => void;
   setSelectedPlaceId: (id: string | null) => void;
+  setSelectedTeam: (team: string | null) => void;
 }
 
 export const useMapStore = create<MapState>((set) => ({
@@ -34,6 +36,7 @@ export const useMapStore = create<MapState>((set) => ({
   liveStatuses: {},
   isProgrammaticMove: false,
   selectedPlaceId: null,
+  selectedTeam: null,
 
   setViewState: (vs) => set({ viewState: vs }),
   setBounds: (bounds) => set({ bounds }),
@@ -50,4 +53,5 @@ export const useMapStore = create<MapState>((set) => ({
     }),
   setIsProgrammaticMove: (value) => set({ isProgrammaticMove: value }),
   setSelectedPlaceId: (id) => set({ selectedPlaceId: id }),
+  setSelectedTeam: (team) => set({ selectedTeam: team }),
 }));
