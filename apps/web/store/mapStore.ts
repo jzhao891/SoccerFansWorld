@@ -23,6 +23,7 @@ interface MapState {
   selectedPlaceId: string | null;
   selectedTeam: string | null;
   flyToTarget: FlyToTarget | null;
+  isFetchingPlaces: boolean;
 
   setViewState: (vs: ViewState) => void;
   setBounds: (bounds: BoundingBox) => void;
@@ -34,6 +35,7 @@ interface MapState {
   setSelectedPlaceId: (id: string | null) => void;
   setSelectedTeam: (team: string | null) => void;
   setFlyToTarget: (target: FlyToTarget | null) => void;
+  setIsFetchingPlaces: (value: boolean) => void;
 }
 
 export const useMapStore = create<MapState>((set) => ({
@@ -46,6 +48,7 @@ export const useMapStore = create<MapState>((set) => ({
   selectedPlaceId: null,
   selectedTeam: null,
   flyToTarget: null,
+  isFetchingPlaces: false,
 
   setViewState: (vs) => set({ viewState: vs }),
   setBounds: (bounds) => set({ bounds }),
@@ -64,4 +67,5 @@ export const useMapStore = create<MapState>((set) => ({
   setSelectedPlaceId: (id) => set({ selectedPlaceId: id }),
   setSelectedTeam: (team) => set({ selectedTeam: team }),
   setFlyToTarget: (target) => set({ flyToTarget: target }),
+  setIsFetchingPlaces: (value) => set({ isFetchingPlaces: value }),
 }));
