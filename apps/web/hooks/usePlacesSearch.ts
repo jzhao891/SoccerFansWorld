@@ -27,6 +27,7 @@ function isWithinAllowedRegion(bounds: BoundingBox): boolean {
 export function usePlacesSearch() {
   const bounds = useMapStore((s) => s.bounds);
   const setPlaces = useMapStore((s) => s.setPlaces);
+  const setIsFetchingPlaces = useMapStore((s) => s.setIsFetchingPlaces);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -42,20 +43,25 @@ export function usePlacesSearch() {
       const center = boundsCenter(bounds);
       const body: PlacesRequest = { lat: center.lat, lng: center.lng };
 
-      const res = await fetch('/api/places', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+      setIsFetchingPlaces(true);
+      try {
+        const res = await fetch('/api/places', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
 
-      if (!res.ok) return;
+        if (!res.ok) return;
 
-      const data: PlacesResponse = await res.json();
-      setPlaces(data.places);
+        const data: PlacesResponse = await res.json();
+        setPlaces(data.places);
+      } finally {
+        setIsFetchingPlaces(false);
+      }
     }, DEBOUNCE_MS);
 
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
-  }, [bounds, setPlaces]);
+  }, [bounds, setPlaces, setIsFetchingPlaces]);
 }

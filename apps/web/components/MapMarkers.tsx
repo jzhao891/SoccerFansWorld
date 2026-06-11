@@ -14,10 +14,17 @@ const SOURCE_COLORS: Record<MergedPlace['source'], string> = {
 export default function MapMarkers() {
   const mergedPlaces = useMergedPlaces();
   const setSelectedPlaceId = useMapStore((s) => s.setSelectedPlaceId);
+  const selectedTeam = useMapStore((s) => s.selectedTeam);
+
+  const visiblePlaces = selectedTeam
+    ? mergedPlaces.filter(
+        (p) => p.fanZone?.watching_teams.includes(selectedTeam) ?? false,
+      )
+    : mergedPlaces;
 
   return (
     <>
-      {mergedPlaces.map((place) => (
+      {visiblePlaces.map((place) => (
         <Marker
           key={place.place_id}
           longitude={place.location.lng}

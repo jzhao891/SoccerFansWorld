@@ -1,7 +1,8 @@
 'use client';
 
-import { useRef, useCallback, useMemo, type ReactNode } from 'react';
+import { useRef, useCallback, useMemo, useEffect, type ReactNode } from 'react';
 import Map, { Source, Layer, type MapRef, type ViewStateChangeEvent, type MapEvent } from 'react-map-gl/mapbox';
+import { useMapStore } from '@/store/mapStore';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import type { BoundingBox } from '@sfw/shared';
 import { ALLOWED_REGIONS } from '@sfw/shared';
@@ -24,6 +25,18 @@ interface MapViewProps {
 
 export default function MapView({ onBoundsChange, children }: MapViewProps) {
   const mapRef = useRef<MapRef>(null);
+  const flyToTarget = useMapStore((s) => s.flyToTarget);
+  const setFlyToTarget = useMapStore((s) => s.setFlyToTarget);
+
+  useEffect(() => {
+    if (!flyToTarget || !mapRef.current) return;
+    mapRef.current.flyTo({
+      center: [flyToTarget.lng, flyToTarget.lat],
+      zoom: flyToTarget.zoom ?? 13,
+      duration: 1400,
+    });
+    setFlyToTarget(null);
+  }, [flyToTarget, setFlyToTarget]);
 
   const fogGeoJSON = useMemo(() => buildFogGeoJSON(ALLOWED_REGIONS), []);
 
