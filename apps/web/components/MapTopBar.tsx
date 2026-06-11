@@ -82,7 +82,7 @@ export default function MapTopBar() {
     : WORLD_CUP_2026_TEAMS;
 
   return (
-    <div ref={containerRef} className="absolute top-3 left-3 right-3 z-10">
+    <div ref={containerRef} className="absolute top-3 left-3 right-3 z-10 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[480px]">
       {/* top row: filter button + search input */}
       <div className="flex items-center gap-2">
         {/* filter pill */}
