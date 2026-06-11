@@ -7,6 +7,12 @@ interface ViewState {
   zoom: number;
 }
 
+export interface FlyToTarget {
+  lng: number;
+  lat: number;
+  zoom?: number;
+}
+
 interface MapState {
   viewState: ViewState;
   bounds: BoundingBox | null;
@@ -15,6 +21,9 @@ interface MapState {
   liveStatuses: Record<string, LiveStatus>;
   isProgrammaticMove: boolean;
   selectedPlaceId: string | null;
+  selectedTeam: string | null;
+  flyToTarget: FlyToTarget | null;
+  isFetchingPlaces: boolean;
 
   setViewState: (vs: ViewState) => void;
   setBounds: (bounds: BoundingBox) => void;
@@ -24,6 +33,9 @@ interface MapState {
   removeLiveStatus: (venueId: string) => void;
   setIsProgrammaticMove: (value: boolean) => void;
   setSelectedPlaceId: (id: string | null) => void;
+  setSelectedTeam: (team: string | null) => void;
+  setFlyToTarget: (target: FlyToTarget | null) => void;
+  setIsFetchingPlaces: (value: boolean) => void;
 }
 
 export const useMapStore = create<MapState>((set) => ({
@@ -34,6 +46,9 @@ export const useMapStore = create<MapState>((set) => ({
   liveStatuses: {},
   isProgrammaticMove: false,
   selectedPlaceId: null,
+  selectedTeam: null,
+  flyToTarget: null,
+  isFetchingPlaces: false,
 
   setViewState: (vs) => set({ viewState: vs }),
   setBounds: (bounds) => set({ bounds }),
@@ -50,4 +65,7 @@ export const useMapStore = create<MapState>((set) => ({
     }),
   setIsProgrammaticMove: (value) => set({ isProgrammaticMove: value }),
   setSelectedPlaceId: (id) => set({ selectedPlaceId: id }),
+  setSelectedTeam: (team) => set({ selectedTeam: team }),
+  setFlyToTarget: (target) => set({ flyToTarget: target }),
+  setIsFetchingPlaces: (value) => set({ isFetchingPlaces: value }),
 }));

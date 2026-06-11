@@ -57,9 +57,11 @@ export default function VenueDrawer() {
         }`}
       >
         {place && (
-          <div className="p-5 max-h-[70vh] overflow-y-auto">
-            {/* Handle */}
-            <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+          <div className="p-5 pb-safe max-h-[75vh] overflow-y-auto">
+            {/* Handle — tall tap target, visually thin bar */}
+            <div className="flex justify-center pt-1 pb-3 -mx-5 -mt-5 mb-2 cursor-pointer" onClick={() => setSelectedPlaceId(null)}>
+              <div className="w-10 h-1 bg-gray-300 rounded-full" />
+            </div>
 
             {/* Header */}
             <div className="flex items-start justify-between mb-3">
@@ -172,7 +174,7 @@ export default function VenueDrawer() {
                         onClick={() => checkIn({ crowd_index: option })}
                         disabled={saving}
                         style={{ backgroundColor: selected ? '#111827' : '#fff', color: selected ? '#fff' : '#374151' }}
-                        className="flex-1 py-1.5 rounded-lg text-xs font-medium border border-gray-200 transition-colors"
+                        className="flex-1 py-3 rounded-lg text-sm font-medium border border-gray-200 transition-colors"
                       >
                         {CROWD_EMOJI[option!]} {option}
                       </button>
@@ -190,7 +192,7 @@ export default function VenueDrawer() {
                       onClick={() => checkIn({ sound: option })}
                       disabled={saving}
                       style={{ backgroundColor: selected ? '#111827' : '#fff', color: selected ? '#fff' : '#374151' }}
-                      className="px-4 py-1.5 rounded-lg text-xs font-medium border border-gray-200 transition-colors"
+                      className="px-6 py-3 rounded-lg text-sm font-medium border border-gray-200 transition-colors"
                     >
                       {option === 'On' ? '🔊 On' : '🔇 Off'}
                     </button>
