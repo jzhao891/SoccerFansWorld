@@ -13,7 +13,7 @@ beforeEach(() => {
 // Bounds inside Seattle allowed region
 const seattleBounds = { north: 47.65, south: 47.55, east: -122.25, west: -122.40 };
 // Bounds well outside all allowed regions (NYC)
-const outsideBounds = { north: 40.8, south: 40.6, east: -73.9, west: -74.1 };
+const outsideBounds = { north: 51.6, south: 51.4, east: 0.2, west: -0.3 }; // London — not a host city
 
 const mockPlace: PlaceResult = {
   place_id: 'gp_001',
