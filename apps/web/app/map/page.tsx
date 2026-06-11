@@ -5,6 +5,7 @@ import MapMarkers from '@/components/MapMarkers';
 import VenueDrawer from '@/components/VenueDrawer';
 import TeamFilterBar from '@/components/TeamFilterBar';
 import SearchBar from '@/components/SearchBar';
+import MapStatusOverlay from '@/components/MapStatusOverlay';
 import { useMapStore } from '@/store/mapStore';
 import { useVenueSubscription } from '@/hooks/useVenueSubscription';
 import { usePlacesSearch } from '@/hooks/usePlacesSearch';
@@ -27,6 +28,7 @@ export default function MapPage() {
       <MapView onBoundsChange={handleBoundsChange}>
         <MapMarkers />
       </MapView>
+      <MapStatusOverlay />
       <VenueDrawer />
     </main>
   );
