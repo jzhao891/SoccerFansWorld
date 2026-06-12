@@ -1,0 +1,14 @@
+<svg width="1080" height="1350" viewBox="0 0 1080 1350" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="rainTint" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#23384d" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#101d2b" stop-opacity="0.22"/>
+    </linearGradient>
+    <pattern id="drops" width="60" height="80" patternUnits="userSpaceOnUse" patternTransform="rotate(14)">
+      <line x1="10" y1="0" x2="4" y2="40" stroke="#cfe4f5" stroke-width="2" stroke-opacity="0.35"/>
+      <line x1="40" y1="20" x2="34" y2="60" stroke="#cfe4f5" stroke-width="2" stroke-opacity="0.28"/>
+    </pattern>
+  </defs>
+  <rect width="1080" height="1350" fill="url(#rainTint)"/>
+  <rect width="1080" height="1350" fill="url(#drops)"/>
+</svg>
