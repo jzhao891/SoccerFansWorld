@@ -71,6 +71,15 @@ export type AssetLayer = {
   fit: ImageFit;
 };
 
+// Static artwork owned by the template itself — not customer-swappable. This is
+// the decorative frame border, corner flourishes, logos, etc.
+export type OverlayLayer = {
+  type: 'overlay';
+  src: string;
+  rect: Rect;
+  fit: ImageFit;
+};
+
 // The customer's uploaded photo.
 export type PhotoLayer = {
   type: 'photo';
@@ -93,7 +102,12 @@ export type WatermarkLayer = {
   type: 'watermark';
 };
 
-export type TemplateLayer = AssetLayer | PhotoLayer | TextLayer | WatermarkLayer;
+export type TemplateLayer =
+  | AssetLayer
+  | OverlayLayer
+  | PhotoLayer
+  | TextLayer
+  | WatermarkLayer;
 
 // ─── Templates ─────────────────────────────────────────────────────────────────────
 

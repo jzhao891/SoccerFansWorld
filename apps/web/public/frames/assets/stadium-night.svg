@@ -1,0 +1,33 @@
+<svg width="1080" height="1350" viewBox="0 0 1080 1350" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="nsky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b1a2b"/>
+      <stop offset="1" stop-color="#16314a"/>
+    </linearGradient>
+    <linearGradient id="npitch" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1c5e32"/>
+      <stop offset="1" stop-color="#0f3f20"/>
+    </linearGradient>
+    <radialGradient id="flood" cx="0.5" cy="0" r="0.9">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1080" height="1350" fill="url(#nsky)"/>
+  <rect width="1080" height="700" fill="url(#flood)"/>
+  <rect y="120" width="1080" height="360" fill="#22354a"/>
+  <g fill="#ffd66b" opacity="0.85">
+    <circle cx="150" cy="60" r="10"/><circle cx="540" cy="44" r="12"/><circle cx="930" cy="60" r="10"/>
+  </g>
+  <g fill="#9fb4c9" opacity="0.35">
+    <rect y="190" width="1080" height="12"/><rect y="250" width="1080" height="12"/>
+    <rect y="310" width="1080" height="12"/><rect y="370" width="1080" height="12"/>
+  </g>
+  <rect y="820" width="1080" height="530" fill="url(#npitch)"/>
+  <g opacity="0.14" fill="#ffffff">
+    <rect y="820" width="1080" height="44"/><rect y="908" width="1080" height="44"/>
+    <rect y="996" width="1080" height="44"/><rect y="1084" width="1080" height="44"/>
+    <rect y="1172" width="1080" height="44"/><rect y="1260" width="1080" height="44"/>
+  </g>
+  <text x="540" y="700" text-anchor="middle" font-family="Arial, sans-serif" font-size="30" fill="#9fc4e6" opacity="0.5">stadium-night · placeholder art</text>
+</svg>
