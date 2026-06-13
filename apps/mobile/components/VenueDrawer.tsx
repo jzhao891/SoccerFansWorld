@@ -1,0 +1,320 @@
+import { useRef, useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  Pressable,
+  Animated,
+  StyleSheet,
+  Dimensions,
+  ActivityIndicator,
+} from 'react-native';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { useMapStore, useMergedPlaces } from '@sfw/shared';
+import type { LiveStatus } from '@sfw/shared';
+import { colors, spacing, radius, shadow } from '../theme';
+
+const DRAWER_HEIGHT = Dimensions.get('window').height * 0.75;
+
+const CROWD_OPTIONS: LiveStatus['crowd_index'][] = ['Chill', 'Buzzing', 'Packed', 'Wild'];
+
+const CROWD_EMOJI: Record<string, string> = {
+  Chill: '😌',
+  Buzzing: '🔥',
+  Packed: '🤯',
+  Wild: '🦁',
+};
+
+interface Props {
+  onCreateParty: (location: { lat: number; lng: number }) => void;
+}
+
+export default function VenueDrawer({ onCreateParty }: Props) {
+  const selectedPlaceId = useMapStore((s) => s.selectedPlaceId);
+  const setSelectedPlaceId = useMapStore((s) => s.setSelectedPlaceId);
+  const liveStatuses = useMapStore((s) => s.liveStatuses);
+  const mergedPlaces = useMergedPlaces();
+  const [saving, setSaving] = useState(false);
+
+  const place = mergedPlaces.find((p) => p.place_id === selectedPlaceId) ?? null;
+  const venueId = place?.fanZone?.id ?? null;
+  const liveStatus = venueId ? liveStatuses[venueId] ?? null : null;
+
+  const translateY = useRef(new Animated.Value(DRAWER_HEIGHT)).current;
+
+  useEffect(() => {
+    Animated.spring(translateY, {
+      toValue: place ? 0 : DRAWER_HEIGHT,
+      useNativeDriver: true,
+      bounciness: 0,
+      speed: 14,
+    }).start();
+  }, [place, translateY]);
+
+  async function checkIn(patch: Partial<Pick<LiveStatus, 'crowd_index' | 'sound'>>) {
+    if (!venueId) return;
+    setSaving(true);
+    await setDoc(
+      doc(db, 'live_statuses', venueId),
+      { venue_id: venueId, ...liveStatus, ...patch, updated_at: Date.now() },
+      { merge: true },
+    );
+    setSaving(false);
+  }
+
+  return (
+    <>
+      {place && (
+        <TouchableWithoutFeedback onPress={() => setSelectedPlaceId(null)}>
+          <View style={[StyleSheet.absoluteFillObject, { bottom: DRAWER_HEIGHT }]} />
+        </TouchableWithoutFeedback>
+      )}
+
+      <Animated.View style={[styles.drawer, { transform: [{ translateY }] }]}>
+        {place && (
+          <Pressable
+            style={({ pressed }) => [styles.hostBtn, pressed && styles.hostBtnPressed]}
+            onPress={() => onCreateParty(place.location)}
+          >
+            <Text style={styles.hostBtnText}>🎉  Host watch party here</Text>
+          </Pressable>
+        )}
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <TouchableOpacity style={styles.handleArea} onPress={() => setSelectedPlaceId(null)} activeOpacity={1}>
+            <View style={styles.handle} />
+          </TouchableOpacity>
+
+          {place && (
+            <>
+              {/* Header */}
+              <View style={styles.headerRow}>
+                <View style={styles.headerText}>
+                  <Text style={styles.placeName}>{place.name}</Text>
+                  {place.placeData?.vicinity && (
+                    <Text style={styles.vicinity}>{place.placeData.vicinity}</Text>
+                  )}
+                </View>
+                <TouchableOpacity onPress={() => setSelectedPlaceId(null)} hitSlop={12}>
+                  <Text style={styles.closeBtn}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Meta row */}
+              <View style={styles.metaRow}>
+                {place.placeData?.rating != null && (
+                  <Text style={styles.metaText}>⭐ {place.placeData.rating}</Text>
+                )}
+                {place.placeData?.open_now != null && (
+                  <Text style={[styles.metaText, place.placeData.open_now ? styles.openText : styles.closedText]}>
+                    {place.placeData.open_now ? 'Open now' : 'Closed'}
+                  </Text>
+                )}
+                <View style={[
+                  styles.sourceBadge,
+                  place.source === 'merged' ? styles.sourceMerged :
+                  place.source === 'custom' ? styles.sourceCustom : styles.sourceGoogle,
+                ]}>
+                  <Text style={[
+                    styles.sourceBadgeText,
+                    place.source === 'merged' ? styles.sourceMergedText :
+                    place.source === 'custom' ? styles.sourceCustomText : styles.sourceGoogleText,
+                  ]}>{place.source}</Text>
+                </View>
+              </View>
+
+              {/* Fan zone */}
+              {place.fanZone && (
+                <>
+                  <View style={styles.divider} />
+                  <Text style={styles.sectionTitle}>📺 {place.fanZone.event_title}</Text>
+                  {place.fanZone.kickoff_time > 0 && (
+                    <Text style={styles.subText}>
+                      🕐 {new Date(place.fanZone.kickoff_time).toLocaleString(undefined, {
+                        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+                      })}
+                    </Text>
+                  )}
+                  {place.fanZone.description && (
+                    <Text style={[styles.subText, styles.italic]}>{place.fanZone.description}</Text>
+                  )}
+                  {place.fanZone.watching_teams.length > 0 && (
+                    <View style={styles.tagRow}>
+                      {place.fanZone.watching_teams.map((team) => (
+                        <View key={team} style={styles.tag}>
+                          <Text style={styles.tagText}>{team}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                  {place.fanZone.amenities.length > 0 && (
+                    <View style={{ marginTop: 10 }}>
+                      <Text style={styles.labelText}>Amenities</Text>
+                      <View style={styles.tagRow}>
+                        {place.fanZone.amenities.map((a) => (
+                          <View key={a} style={styles.tag}>
+                            <Text style={styles.tagText}>{a.replace(/_/g, ' ')}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+                </>
+              )}
+
+              {/* Live status */}
+              {liveStatus && (
+                <>
+                  <View style={styles.divider} />
+                  <View style={styles.liveRow}>
+                    {liveStatus.crowd_index && (
+                      <View>
+                        <Text style={styles.labelText}>Crowd</Text>
+                        <Text style={styles.liveValue}>{CROWD_EMOJI[liveStatus.crowd_index]} {liveStatus.crowd_index}</Text>
+                      </View>
+                    )}
+                    {liveStatus.sound && (
+                      <View>
+                        <Text style={styles.labelText}>Sound</Text>
+                        <Text style={styles.liveValue}>{liveStatus.sound === 'On' ? '🔊 On' : '🔇 Off'}</Text>
+                      </View>
+                    )}
+                    {liveStatus.fan_ratio && (
+                      <View>
+                        <Text style={styles.labelText}>Fan ratio</Text>
+                        <Text style={styles.liveValue}>{liveStatus.fan_ratio}</Text>
+                      </View>
+                    )}
+                  </View>
+                </>
+              )}
+
+              {/* Check-in */}
+              {venueId && (
+                <>
+                  <View style={styles.divider} />
+                  <View style={styles.checkinHeader}>
+                    <Text style={styles.checkinLabel}>CHECK IN</Text>
+                    {saving && <ActivityIndicator size="small" color="#9CA3AF" style={{ marginLeft: 8 }} />}
+                  </View>
+
+                  <Text style={styles.labelText}>How's the crowd?</Text>
+                  <View style={styles.crowdRow}>
+                    {CROWD_OPTIONS.map((option) => {
+                      const selected = liveStatus?.crowd_index === option;
+                      return (
+                        <TouchableOpacity
+                          key={option}
+                          style={[styles.optionBtn, selected && styles.optionBtnSelected]}
+                          onPress={() => checkIn({ crowd_index: option })}
+                          disabled={saving}
+                        >
+                          <Text style={[styles.optionBtnText, selected && styles.optionBtnTextSelected]}>
+                            {CROWD_EMOJI[option!]}{'\n'}{option}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  <Text style={[styles.labelText, { marginTop: 14 }]}>Sound on?</Text>
+                  <View style={styles.soundRow}>
+                    {(['On', 'Off'] as const).map((option) => {
+                      const selected = liveStatus?.sound === option;
+                      return (
+                        <TouchableOpacity
+                          key={option}
+                          style={[styles.optionBtn, selected && styles.optionBtnSelected]}
+                          onPress={() => checkIn({ sound: option })}
+                          disabled={saving}
+                        >
+                          <Text style={[styles.optionBtnText, selected && styles.optionBtnTextSelected]}>
+                            {option === 'On' ? '🔊 On' : '🔇 Off'}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
+            </>
+          )}
+        </ScrollView>
+      </Animated.View>
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  drawer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: DRAWER_HEIGHT,
+    backgroundColor: colors.white,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    zIndex: 20,
+    ...shadow.lg,
+  },
+  scroll: { flex: 1 },
+  scrollContent: { paddingHorizontal: spacing.xl, paddingBottom: 40 },
+  handleArea: { alignItems: 'center', paddingVertical: spacing.md },
+  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
+  headerText: { flex: 1, marginRight: spacing.md },
+  placeName: { fontSize: 20, fontWeight: '700', color: colors.black },
+  vicinity: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  closeBtn: { fontSize: 18, color: colors.textFaint },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md },
+  metaText: { fontSize: 13, color: '#4B5563' },
+  openText: { color: colors.open },
+  closedText: { color: colors.closed },
+  sourceBadge: { paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.full },
+  sourceBadgeText: { fontSize: 11, fontWeight: '600' },
+  sourceMerged: { backgroundColor: colors.mergedBg },
+  sourceMergedText: { color: colors.mergedText },
+  sourceCustom: { backgroundColor: colors.customBg },
+  sourceCustomText: { color: colors.customText },
+  sourceGoogle: { backgroundColor: colors.googleBg },
+  sourceGoogleText: { color: colors.googleText },
+  divider: { height: 1, backgroundColor: colors.borderLight, marginVertical: 14 },
+  sectionTitle: { fontSize: 14, fontWeight: '600', color: colors.textSecondary, marginBottom: spacing.xs },
+  subText: { fontSize: 12, color: colors.textMuted, marginBottom: 2 },
+  italic: { fontStyle: 'italic', marginTop: spacing.xs },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
+  tag: { paddingHorizontal: 10, paddingVertical: spacing.xs, backgroundColor: colors.borderLight, borderRadius: radius.full },
+  tagText: { fontSize: 12, color: '#4B5563' },
+  labelText: { fontSize: 12, color: colors.textFaint, marginBottom: spacing.xs },
+  liveRow: { flexDirection: 'row', gap: spacing.xxl },
+  liveValue: { fontSize: 14, fontWeight: '500', color: colors.black, marginTop: 2 },
+  checkinHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
+  checkinLabel: { fontSize: 11, fontWeight: '700', color: colors.textFaint, letterSpacing: 1 },
+  crowdRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  soundRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  optionBtn: {
+    flex: 1, paddingVertical: 10, borderRadius: radius.sm,
+    borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white, alignItems: 'center',
+  },
+  optionBtnSelected: { backgroundColor: colors.black, borderColor: colors.black },
+  optionBtnText: { fontSize: 12, fontWeight: '500', color: colors.textSecondary, textAlign: 'center' },
+  optionBtnTextSelected: { color: colors.white },
+  hostBtn: {
+    backgroundColor: colors.black,
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+    borderRadius: radius.md,
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  hostBtnPressed: { opacity: 0.75 },
+  hostBtnText: { fontSize: 14, fontWeight: '600', color: colors.white },
+});

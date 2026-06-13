@@ -34,6 +34,7 @@ export type FanZone = {
   kickoff_time: number;     // Unix timestamp ms
   watching_teams: string[]; // e.g. ["USA", "England"]
   amenities: string[];      // e.g. ["big screen", "outdoor seating"]
+  description?: string;     // free-text host note, custom parties only
   is_active: boolean;
   created_by: string;
   created_at: number;       // Unix timestamp ms

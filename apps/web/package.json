@@ -24,8 +24,10 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-map-gl": "^8.1.1",
-    "sharp": "^0.34.5",
     "zustand": "^5.0.14"
+  },
+  "optionalDependencies": {
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
