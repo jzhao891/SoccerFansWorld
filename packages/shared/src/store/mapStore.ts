@@ -1,5 +1,15 @@
 import { create } from 'zustand';
-import type { BoundingBox, FanZone, LiveStatus, PlaceResult } from '../types/map';
+import type { BoundingBox, FanZone, LatLng, LiveStatus, PlaceResult } from '../types/map';
+
+// ~15 km in degrees latitude — used for distance-based cache eviction
+const EVICT_RADIUS_DEG = 0.135;
+
+function isNear(place: PlaceResult, center: LatLng): boolean {
+  return (
+    Math.abs(place.location.lat - center.lat) <= EVICT_RADIUS_DEG &&
+    Math.abs(place.location.lng - center.lng) <= EVICT_RADIUS_DEG
+  );
+}
 
 interface ViewState {
   longitude: number;
@@ -17,6 +27,7 @@ interface MapState {
   viewState: ViewState;
   bounds: BoundingBox | null;
   places: PlaceResult[];
+  placesCache: Record<string, PlaceResult>;
   fanZones: FanZone[];
   liveStatuses: Record<string, LiveStatus>;
   isProgrammaticMove: boolean;
@@ -27,7 +38,9 @@ interface MapState {
 
   setViewState: (vs: ViewState) => void;
   setBounds: (bounds: BoundingBox) => void;
-  setPlaces: (places: PlaceResult[]) => void;
+  clearPlaces: () => void;
+  mergePlaces: (newPlaces: PlaceResult[]) => void;
+  evictFarPlaces: (center: LatLng) => void;
   setFanZones: (fanZones: FanZone[]) => void;
   setLiveStatus: (status: LiveStatus) => void;
   removeLiveStatus: (venueId: string) => void;
@@ -42,6 +55,7 @@ export const useMapStore = create<MapState>((set) => ({
   viewState: { longitude: -122.3321, latitude: 47.6062, zoom: 13 },
   bounds: null,
   places: [],
+  placesCache: {},
   fanZones: [],
   liveStatuses: {},
   isProgrammaticMove: false,
@@ -52,7 +66,21 @@ export const useMapStore = create<MapState>((set) => ({
 
   setViewState: (vs) => set({ viewState: vs }),
   setBounds: (bounds) => set({ bounds }),
-  setPlaces: (places) => set({ places }),
+  clearPlaces: () => set({ places: [], placesCache: {} }),
+  mergePlaces: (newPlaces) =>
+    set((state) => {
+      const cache = { ...state.placesCache };
+      for (const p of newPlaces) cache[p.place_id] = p;
+      return { placesCache: cache, places: Object.values(cache) };
+    }),
+  evictFarPlaces: (center) =>
+    set((state) => {
+      const cache: Record<string, PlaceResult> = {};
+      for (const [id, place] of Object.entries(state.placesCache)) {
+        if (isNear(place, center)) cache[id] = place;
+      }
+      return { placesCache: cache, places: Object.values(cache) };
+    }),
   setFanZones: (fanZones) => set({ fanZones }),
   setLiveStatus: (status) =>
     set((state) => ({

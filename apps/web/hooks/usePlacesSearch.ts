@@ -26,14 +26,16 @@ function isWithinAllowedRegion(bounds: BoundingBox): boolean {
 
 export function usePlacesSearch() {
   const bounds = useMapStore((s) => s.bounds);
-  const setPlaces = useMapStore((s) => s.setPlaces);
+  const clearPlaces = useMapStore((s) => s.clearPlaces);
+  const mergePlaces = useMapStore((s) => s.mergePlaces);
+  const evictFarPlaces = useMapStore((s) => s.evictFarPlaces);
   const setIsFetchingPlaces = useMapStore((s) => s.setIsFetchingPlaces);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!bounds) return;
     if (!isWithinAllowedRegion(bounds)) {
-      setPlaces([]);
+      clearPlaces();
       return;
     }
 
@@ -52,7 +54,10 @@ export function usePlacesSearch() {
         });
         if (!res.ok) return;
         const data: PlacesResponse = await res.json();
-        setPlaces(data.places);
+        // Step 1: merge new places — user sees them immediately on next paint
+        mergePlaces(data.places);
+        // Step 2: evict places far from current center after the browser has painted
+        requestAnimationFrame(() => evictFarPlaces(center));
       } finally {
         setIsFetchingPlaces(false);
       }
@@ -61,5 +66,5 @@ export function usePlacesSearch() {
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
-  }, [bounds, setPlaces, setIsFetchingPlaces]);
+  }, [bounds, clearPlaces, mergePlaces, evictFarPlaces, setIsFetchingPlaces]);
 }
