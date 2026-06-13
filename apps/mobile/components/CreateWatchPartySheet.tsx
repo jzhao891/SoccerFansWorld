@@ -41,9 +41,11 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   defaultLocation?: { lat: number; lng: number };
+  defaultSource?: 'google' | 'osm' | 'custom';
+  defaultVenueId?: string | null;
 }
 
-export default function CreateWatchPartySheet({ visible, onClose, defaultLocation }: Props) {
+export default function CreateWatchPartySheet({ visible, onClose, defaultLocation, defaultSource, defaultVenueId }: Props) {
   const bounds = useMapStore((s) => s.bounds);
   const viewState = useMapStore((s) => s.viewState);
 
@@ -132,7 +134,8 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
     try {
       const ref = doc(collection(db, 'venues'));
       await setDoc(ref, {
-        google_place_id: null,
+        source: defaultSource ?? 'custom',
+        venue_id: defaultVenueId ?? null,
         name: partyName.trim(),
         event_title: eventTitle.trim(),
         ...(description.trim() ? { description: description.trim() } : {}),

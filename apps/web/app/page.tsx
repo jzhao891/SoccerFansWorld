@@ -30,10 +30,10 @@ export default function MapPage() {
     menuPos: { x: number; y: number };
   } | null>(null);
 
-  // Location passed into the creation sheet (captured before mapPin is cleared)
-  const [sheetDefaultLocation, setSheetDefaultLocation] = useState<
-    { lat: number; lng: number } | undefined
-  >(undefined);
+  // Venue context passed into the creation sheet (captured before pin/drawer is cleared)
+  const [sheetDefaultLocation, setSheetDefaultLocation] = useState<{ lat: number; lng: number } | undefined>(undefined);
+  const [sheetSource, setSheetSource] = useState<'google' | 'osm' | 'custom'>('custom');
+  const [sheetVenueId, setSheetVenueId] = useState<string | null>(null);
 
   const [createSheetOpen, setCreateSheetOpen] = useState(false);
 
@@ -62,9 +62,14 @@ export default function MapPage() {
     );
   }, [setSelectedOsmVenue, setSelectedPlaceId]);
 
-  function handleCreateParty(location?: { lat: number; lng: number }) {
-    // Capture location before clearing the pin
+  function handleCreateParty(
+    location?: { lat: number; lng: number },
+    source: 'google' | 'osm' | 'custom' = 'custom',
+    venue_id: string | null = null,
+  ) {
     setSheetDefaultLocation(location ?? mapPin?.location);
+    setSheetSource(source);
+    setSheetVenueId(venue_id);
     setMapPin(null);
     setCreateSheetOpen(true);
   }
@@ -99,9 +104,11 @@ export default function MapPage() {
       <CreateWatchPartySheet
         isOpen={createSheetOpen}
         defaultLocation={sheetDefaultLocation}
+        defaultSource={sheetSource}
+        defaultVenueId={sheetVenueId}
         onClose={() => setCreateSheetOpen(false)}
       />
-      <VenueDrawer onCreateParty={(loc) => handleCreateParty(loc)} />
+      <VenueDrawer onCreateParty={(loc, src, vid) => handleCreateParty(loc, src, vid)} />
 
       {/* Studio FAB */}
       <Link
