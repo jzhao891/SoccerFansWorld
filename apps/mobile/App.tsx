@@ -1,5 +1,5 @@
 import './lib/firebase'; // initializes Firebase and calls setDb
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -18,6 +18,7 @@ import type { BoundingBox } from '@sfw/shared';
 
 function MapScreen() {
   const setBounds = useMapStore((s) => s.setBounds);
+  const selectedPlaceId = useMapStore((s) => s.selectedPlaceId);
   const setSelectedPlaceId = useMapStore((s) => s.setSelectedPlaceId);
   const [mapPressPoint, setMapPressPoint] = useState<{ lat: number; lng: number } | null>(null);
   const [mapPressScreen, setMapPressScreen] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -28,6 +29,10 @@ function MapScreen() {
 
   useVenueSubscription();
   usePlacesSearch();
+
+  useEffect(() => {
+    if (selectedPlaceId) setMapPressPoint(null);
+  }, [selectedPlaceId]);
 
   function handleBoundsChange(bounds: BoundingBox) {
     setBounds(bounds);
