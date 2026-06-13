@@ -7,41 +7,41 @@ export function useMergedPlaces(): MergedPlace[] {
   const fanZones = useMapStore((s) => s.fanZones);
 
   return useMemo(() => {
-    const merged = new Map<string, MergedPlace>();
+    const result: MergedPlace[] = [];
 
-    for (const place of places) {
-      merged.set(place.place_id, {
-        place_id: place.place_id,
-        name: place.name,
-        location: place.location,
-        source: 'google',
-        placeData: place,
+    // Google venue ids covered by a FanZone — suppress their blue dot
+    const coveredGoogleIds = new Set(
+      fanZones
+        .filter((fz) => fz.source === 'google' && fz.venue_id)
+        .map((fz) => fz.venue_id!)
+    );
+
+    // All FanZones always shown regardless of origin
+    for (const fz of fanZones) {
+      result.push({
+        id: fz.id,
+        name: fz.name,
+        location: fz.location,
+        source: 'fanzone',
+        fanZone: fz,
       });
     }
 
-    for (const fanZone of fanZones) {
-      const googlePlaceId = fanZone.google_place_id;
-
-      if (googlePlaceId === null) {
-        merged.set(fanZone.id, {
-          place_id: fanZone.id,
-          name: fanZone.name,
-          location: fanZone.location,
-          source: 'custom',
-          fanZone,
-        });
-      } else if (merged.has(googlePlaceId)) {
-        const existing = merged.get(googlePlaceId)!;
-        merged.set(googlePlaceId, {
-          ...existing,
-          source: 'merged',
-          fanZone,
+    // Google places shown only if no FanZone covers them
+    for (const venue of places) {
+      if (venue.source === 'google' && !coveredGoogleIds.has(venue.id)) {
+        result.push({
+          id: venue.id,
+          name: venue.name,
+          location: venue.location,
+          source: 'google',
+          googleData: venue,
         });
       }
-      // FanZone has a google_place_id but Places didn't return it in this search radius/cap —
-      // skip here; it will appear as 'merged' once the user zooms in close enough.
     }
 
-    return Array.from(merged.values());
+    // All OSM venues always shown automatically by Mapbox.
+
+    return result;
   }, [places, fanZones]);
 }
