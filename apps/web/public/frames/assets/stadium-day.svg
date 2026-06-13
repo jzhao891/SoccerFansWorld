@@ -1,0 +1,33 @@
+<svg width="1080" height="1350" viewBox="0 0 1080 1350" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7ec8f2"/>
+      <stop offset="1" stop-color="#cdeafc"/>
+    </linearGradient>
+    <linearGradient id="pitch" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f8a45"/>
+      <stop offset="1" stop-color="#1f6c34"/>
+    </linearGradient>
+  </defs>
+  <rect width="1080" height="1350" fill="url(#sky)"/>
+  <!-- upper stand -->
+  <rect y="120" width="1080" height="360" fill="#5b6b7a"/>
+  <g fill="#3f4d5a" opacity="0.5">
+    <rect y="180" width="1080" height="14"/>
+    <rect y="240" width="1080" height="14"/>
+    <rect y="300" width="1080" height="14"/>
+    <rect y="360" width="1080" height="14"/>
+    <rect y="420" width="1080" height="14"/>
+  </g>
+  <!-- pitch -->
+  <rect y="820" width="1080" height="530" fill="url(#pitch)"/>
+  <g opacity="0.18" fill="#ffffff">
+    <rect y="820" width="1080" height="44"/>
+    <rect y="908" width="1080" height="44"/>
+    <rect y="996" width="1080" height="44"/>
+    <rect y="1084" width="1080" height="44"/>
+    <rect y="1172" width="1080" height="44"/>
+    <rect y="1260" width="1080" height="44"/>
+  </g>
+  <text x="540" y="700" text-anchor="middle" font-family="Arial, sans-serif" font-size="30" fill="#1c3a52" opacity="0.45">stadium-day · placeholder art</text>
+</svg>
