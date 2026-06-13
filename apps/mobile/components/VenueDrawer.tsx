@@ -39,7 +39,7 @@ export default function VenueDrawer({ onCreateParty }: Props) {
   const mergedPlaces = useMergedPlaces();
   const [saving, setSaving] = useState(false);
 
-  const place = mergedPlaces.find((p) => p.place_id === selectedPlaceId) ?? null;
+  const place = mergedPlaces.find((p) => p.id === selectedPlaceId) ?? null;
   const venueId = place?.fanZone?.id ?? null;
   const liveStatus = venueId ? liveStatuses[venueId] ?? null : null;
 
@@ -97,8 +97,8 @@ export default function VenueDrawer({ onCreateParty }: Props) {
               <View style={styles.headerRow}>
                 <View style={styles.headerText}>
                   <Text style={styles.placeName}>{place.name}</Text>
-                  {place.placeData?.vicinity && (
-                    <Text style={styles.vicinity}>{place.placeData.vicinity}</Text>
+                  {place.googleData?.vicinity && (
+                    <Text style={styles.vicinity}>{place.googleData.vicinity}</Text>
                   )}
                 </View>
                 <TouchableOpacity onPress={() => setSelectedPlaceId(null)} hitSlop={12}>
@@ -108,12 +108,12 @@ export default function VenueDrawer({ onCreateParty }: Props) {
 
               {/* Meta row */}
               <View style={styles.metaRow}>
-                {place.placeData?.rating != null && (
-                  <Text style={styles.metaText}>⭐ {place.placeData.rating}</Text>
+                {place.googleData?.rating != null && (
+                  <Text style={styles.metaText}>⭐ {place.googleData.rating}</Text>
                 )}
-                {place.placeData?.open_now != null && (
-                  <Text style={[styles.metaText, place.placeData.open_now ? styles.openText : styles.closedText]}>
-                    {place.placeData.open_now ? 'Open now' : 'Closed'}
+                {place.googleData?.open_now != null && (
+                  <Text style={[styles.metaText, place.googleData.open_now ? styles.openText : styles.closedText]}>
+                    {place.googleData.open_now ? 'Open now' : 'Closed'}
                   </Text>
                 )}
                 <View style={[

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Marker } from 'react-map-gl/mapbox';
@@ -20,6 +20,9 @@ const MapView = dynamic(() => import('@/components/MapView'), { ssr: false });
 
 export default function MapPage() {
   const setBounds = useMapStore((s) => s.setBounds);
+  const selectedPlaceId = useMapStore((s) => s.selectedPlaceId);
+  const setSelectedOsmVenue = useMapStore((s) => s.setSelectedOsmVenue);
+  const setSelectedPlaceId = useMapStore((s) => s.setSelectedPlaceId);
 
   // Pin and menu are always paired — null means both hidden
   const [mapPin, setMapPin] = useState<{
@@ -39,13 +42,25 @@ export default function MapPage() {
 
   const handleBoundsChange = (bounds: BoundingBox) => setBounds(bounds);
 
-  const handleMapClick = useCallback(({ lngLat, point }: MapClickPayload) => {
-    // Pin+menu visible → dismiss both
-    // Pin+menu hidden → drop pin and open menu
+  // Clear drop-pin when a venue is selected from the markers
+  useEffect(() => {
+    if (selectedPlaceId) setMapPin(null);
+  }, [selectedPlaceId]);
+
+  const handleMapClick = useCallback(({ lngLat, point, osmVenue }: MapClickPayload) => {
+    if (osmVenue) {
+      // OSM POI tap — open drawer directly, no pin-drop
+      setSelectedPlaceId(null);
+      setSelectedOsmVenue(osmVenue);
+      setMapPin(null);
+      return;
+    }
+    // Empty map tap — pin+menu visible → dismiss, hidden → drop pin and open menu
+    setSelectedOsmVenue(null);
     setMapPin((prev) =>
       prev ? null : { location: lngLat, menuPos: { x: point.x, y: point.y } },
     );
-  }, []);
+  }, [setSelectedOsmVenue, setSelectedPlaceId]);
 
   function handleCreateParty(location?: { lat: number; lng: number }) {
     // Capture location before clearing the pin
@@ -55,7 +70,7 @@ export default function MapPage() {
   }
 
   return (
-    <main className="w-screen h-screen relative">
+    <main className="w-screen h-screen relative bg-gray-200">
       <MapTopBar />
       <MapView onBoundsChange={handleBoundsChange} onMapClick={handleMapClick}>
         <MapMarkers />

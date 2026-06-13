@@ -5,9 +5,8 @@ import type { MergedPlace } from '@sfw/shared';
 import { colors, shadow } from '../theme';
 
 const SOURCE_COLORS: Record<MergedPlace['source'], string> = {
-  google: colors.pinGoogle,
-  custom: colors.pinCustom,
-  merged: colors.pinMerged,
+  google:  colors.pinGoogle,   // blue — Google place with no FanZone
+  fanzone: colors.pinCustom,   // orange — user-created FanZone (any origin)
 };
 
 export default function MapMarkers() {
@@ -23,13 +22,13 @@ export default function MapMarkers() {
     <>
       {visiblePlaces.map((place) => (
         <Mapbox.PointAnnotation
-          key={place.place_id}
-          id={place.place_id}
+          key={place.id}
+          id={place.id}
           coordinate={[place.location.lng, place.location.lat]}
           anchor={{ x: 0.5, y: 1 }}
-          onSelected={() => setSelectedPlaceId(place.place_id)}
+          onSelected={() => setSelectedPlaceId(place.id)}
         >
-          <TouchableOpacity onPress={() => setSelectedPlaceId(place.place_id)}>
+          <TouchableOpacity onPress={() => setSelectedPlaceId(place.id)}>
             <View
               style={[
                 styles.marker,

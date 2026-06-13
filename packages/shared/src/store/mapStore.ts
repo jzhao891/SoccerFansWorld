@@ -1,13 +1,13 @@
 import { create } from 'zustand';
-import type { BoundingBox, FanZone, LatLng, LiveStatus, PlaceResult } from '../types/map';
+import type { BoundingBox, FanZone, LatLng, LiveStatus, OsmVenue, Venue } from '../types/map';
 
 // ~15 km in degrees latitude — used for distance-based cache eviction
 const EVICT_RADIUS_DEG = 0.135;
 
-function isNear(place: PlaceResult, center: LatLng): boolean {
+function isNear(venue: Venue, center: LatLng): boolean {
   return (
-    Math.abs(place.location.lat - center.lat) <= EVICT_RADIUS_DEG &&
-    Math.abs(place.location.lng - center.lng) <= EVICT_RADIUS_DEG
+    Math.abs(venue.location.lat - center.lat) <= EVICT_RADIUS_DEG &&
+    Math.abs(venue.location.lng - center.lng) <= EVICT_RADIUS_DEG
   );
 }
 
@@ -26,12 +26,13 @@ export interface FlyToTarget {
 interface MapState {
   viewState: ViewState;
   bounds: BoundingBox | null;
-  places: PlaceResult[];
-  placesCache: Record<string, PlaceResult>;
+  places: Venue[];
+  placesCache: Record<string, Venue>;
   fanZones: FanZone[];
   liveStatuses: Record<string, LiveStatus>;
   isProgrammaticMove: boolean;
   selectedPlaceId: string | null;
+  selectedOsmVenue: OsmVenue | null;
   selectedTeam: string | null;
   flyToTarget: FlyToTarget | null;
   isFetchingPlaces: boolean;
@@ -39,13 +40,14 @@ interface MapState {
   setViewState: (vs: ViewState) => void;
   setBounds: (bounds: BoundingBox) => void;
   clearPlaces: () => void;
-  mergePlaces: (newPlaces: PlaceResult[]) => void;
+  mergePlaces: (newPlaces: Venue[]) => void;
   evictFarPlaces: (center: LatLng) => void;
   setFanZones: (fanZones: FanZone[]) => void;
   setLiveStatus: (status: LiveStatus) => void;
   removeLiveStatus: (venueId: string) => void;
   setIsProgrammaticMove: (value: boolean) => void;
   setSelectedPlaceId: (id: string | null) => void;
+  setSelectedOsmVenue: (venue: OsmVenue | null) => void;
   setSelectedTeam: (team: string | null) => void;
   setFlyToTarget: (target: FlyToTarget | null) => void;
   setIsFetchingPlaces: (value: boolean) => void;
@@ -60,6 +62,7 @@ export const useMapStore = create<MapState>((set) => ({
   liveStatuses: {},
   isProgrammaticMove: false,
   selectedPlaceId: null,
+  selectedOsmVenue: null,
   selectedTeam: null,
   flyToTarget: null,
   isFetchingPlaces: false,
@@ -70,14 +73,14 @@ export const useMapStore = create<MapState>((set) => ({
   mergePlaces: (newPlaces) =>
     set((state) => {
       const cache = { ...state.placesCache };
-      for (const p of newPlaces) cache[p.place_id] = p;
+      for (const v of newPlaces) cache[v.id] = v;
       return { placesCache: cache, places: Object.values(cache) };
     }),
   evictFarPlaces: (center) =>
     set((state) => {
-      const cache: Record<string, PlaceResult> = {};
-      for (const [id, place] of Object.entries(state.placesCache)) {
-        if (isNear(place, center)) cache[id] = place;
+      const cache: Record<string, Venue> = {};
+      for (const [id, venue] of Object.entries(state.placesCache)) {
+        if (isNear(venue, center)) cache[id] = venue;
       }
       return { placesCache: cache, places: Object.values(cache) };
     }),
@@ -93,6 +96,7 @@ export const useMapStore = create<MapState>((set) => ({
     }),
   setIsProgrammaticMove: (value) => set({ isProgrammaticMove: value }),
   setSelectedPlaceId: (id) => set({ selectedPlaceId: id }),
+  setSelectedOsmVenue: (venue) => set({ selectedOsmVenue: venue }),
   setSelectedTeam: (team) => set({ selectedTeam: team }),
   setFlyToTarget: (target) => set({ flyToTarget: target }),
   setIsFetchingPlaces: (value) => set({ isFetchingPlaces: value }),

@@ -23,11 +23,14 @@ interface Props {
 export default function VenueDrawer({ onCreateParty }: Props) {
   const selectedPlaceId = useMapStore((s) => s.selectedPlaceId);
   const setSelectedPlaceId = useMapStore((s) => s.setSelectedPlaceId);
+  const selectedOsmVenue = useMapStore((s) => s.selectedOsmVenue);
+  const setSelectedOsmVenue = useMapStore((s) => s.setSelectedOsmVenue);
   const liveStatuses = useMapStore((s) => s.liveStatuses);
   const mergedPlaces = useMergedPlaces();
   const [saving, setSaving] = useState(false);
 
-  const place = mergedPlaces.find((p) => p.place_id === selectedPlaceId) ?? null;
+  const osmVenue = selectedOsmVenue;
+  const place = osmVenue ? null : (mergedPlaces.find((p) => p.id === selectedPlaceId) ?? null);
   const venueId = place?.fanZone?.id ?? null;
   const liveStatus = venueId ? liveStatuses[venueId] ?? null : null;
 
@@ -42,16 +45,18 @@ export default function VenueDrawer({ onCreateParty }: Props) {
     setSaving(false);
   }
 
-  const isOpen = place !== null;
+  const isOpen = osmVenue !== null || place !== null;
+
+  function dismiss() {
+    setSelectedPlaceId(null);
+    setSelectedOsmVenue(null);
+  }
 
   return (
     <>
       {/* Backdrop */}
       {isOpen && (
-        <div
-          className="fixed inset-0 z-10"
-          onClick={() => setSelectedPlaceId(null)}
-        />
+        <div className="fixed inset-0 z-10" onClick={dismiss} />
       )}
 
       {/* Drawer */}
@@ -60,10 +65,36 @@ export default function VenueDrawer({ onCreateParty }: Props) {
           isOpen ? 'translate-y-0' : 'translate-y-full'
         }`}
       >
+        {/* OSM venue — name and category only */}
+        {osmVenue && (
+          <div className="p-5 pb-safe">
+            <div className="flex justify-center pt-1 pb-3 -mx-5 -mt-5 mb-2 cursor-pointer" onClick={dismiss}>
+              <div className="w-10 h-1 bg-gray-300 rounded-full" />
+            </div>
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">{osmVenue.name}</h2>
+                <p className="text-sm text-gray-500 mt-0.5 capitalize">{osmVenue.category}</p>
+              </div>
+              <button onClick={dismiss} className="text-gray-400 hover:text-gray-600 text-2xl leading-none ml-4">×</button>
+            </div>
+            {onCreateParty && (
+              <div className="border-t pt-4">
+                <button
+                  onClick={() => { onCreateParty(osmVenue.location); dismiss(); }}
+                  className="w-full py-3 rounded-xl bg-gray-500/10 text-sm font-medium text-gray-600 hover:bg-gray-500/15 flex items-center justify-center gap-2"
+                >
+                  🎉 Create watch party here
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {place && (
           <div className="p-5 pb-safe max-h-[75vh] overflow-y-auto">
             {/* Handle — tall tap target, visually thin bar */}
-            <div className="flex justify-center pt-1 pb-3 -mx-5 -mt-5 mb-2 cursor-pointer" onClick={() => setSelectedPlaceId(null)}>
+            <div className="flex justify-center pt-1 pb-3 -mx-5 -mt-5 mb-2 cursor-pointer" onClick={dismiss}>
               <div className="w-10 h-1 bg-gray-300 rounded-full" />
             </div>
 
@@ -71,12 +102,12 @@ export default function VenueDrawer({ onCreateParty }: Props) {
             <div className="flex items-start justify-between mb-3">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">{place.name}</h2>
-                {place.placeData?.vicinity && (
-                  <p className="text-sm text-gray-500 mt-0.5">{place.placeData.vicinity}</p>
+                {place.googleData?.vicinity && (
+                  <p className="text-sm text-gray-500 mt-0.5">{place.googleData.vicinity}</p>
                 )}
               </div>
               <button
-                onClick={() => setSelectedPlaceId(null)}
+                onClick={dismiss}
                 className="text-gray-400 hover:text-gray-600 text-2xl leading-none ml-4"
               >
                 ×
@@ -85,20 +116,19 @@ export default function VenueDrawer({ onCreateParty }: Props) {
 
             {/* Google data row */}
             <div className="flex gap-4 mb-4 text-sm text-gray-600">
-              {place.placeData?.rating && (
-                <span>⭐ {place.placeData.rating}</span>
+              {place.googleData?.rating && (
+                <span>⭐ {place.googleData.rating}</span>
               )}
-              {place.placeData?.open_now !== undefined && (
-                <span className={place.placeData.open_now ? 'text-green-600' : 'text-red-500'}>
-                  {place.placeData.open_now ? 'Open now' : 'Closed'}
+              {place.googleData?.open_now !== undefined && (
+                <span className={place.googleData.open_now ? 'text-green-600' : 'text-red-500'}>
+                  {place.googleData.open_now ? 'Open now' : 'Closed'}
                 </span>
               )}
               <span className={`capitalize px-2 py-0.5 rounded-full text-xs font-medium ${
-                place.source === 'merged' ? 'bg-green-100 text-green-700' :
-                place.source === 'custom' ? 'bg-orange-100 text-orange-700' :
+                place.source === 'fanzone' ? 'bg-orange-100 text-orange-700' :
                 'bg-blue-100 text-blue-700'
               }`}>
-                {place.source}
+                {place.source === 'fanzone' ? (place.fanZone?.source ?? 'fanzone') : 'google'}
               </span>
             </div>
 
@@ -176,7 +206,7 @@ export default function VenueDrawer({ onCreateParty }: Props) {
               <div className="border-t pt-4 mb-2">
                 <button
                   onClick={() => { onCreateParty(place.location); setSelectedPlaceId(null); }}
-                  className="w-full py-3 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2"
+                  className="w-full py-3 rounded-xl bg-gray-500/10 text-sm font-medium text-gray-600 hover:bg-gray-500/15 flex items-center justify-center gap-2"
                 >
                   🎉 Create watch party here
                 </button>

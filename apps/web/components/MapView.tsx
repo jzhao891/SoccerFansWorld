@@ -4,7 +4,7 @@ import { useRef, useCallback, useMemo, useEffect, type ReactNode } from 'react';
 import Map, { Source, Layer, type MapRef, type ViewStateChangeEvent, type MapEvent, type MapMouseEvent } from 'react-map-gl/mapbox';
 import { useMapStore } from '@/store/mapStore';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import type { BoundingBox } from '@sfw/shared';
+import type { BoundingBox, OsmVenue } from '@sfw/shared';
 import { ALLOWED_REGIONS } from '@sfw/shared';
 import { buildFogGeoJSON } from '@/lib/fogLayer';
 
@@ -21,6 +21,7 @@ const SEATTLE: { longitude: number; latitude: number; zoom: number } = {
 export interface MapClickPayload {
   lngLat: { lat: number; lng: number };
   point: { x: number; y: number };
+  osmVenue?: OsmVenue;
 }
 
 interface MapViewProps {
@@ -71,9 +72,39 @@ export default function MapView({ onBoundsChange, onMapClick, children }: MapVie
     [fireBoundsChange],
   );
 
+  const poiCursorActive = useRef(false);
+  const handleMouseMove = useCallback((e: MapMouseEvent) => {
+    const features = e.target.queryRenderedFeatures(e.point, { layers: ['poi-label'] });
+    const canvas = e.target.getCanvas();
+    if (features.length > 0) {
+      canvas.style.cursor = 'pointer';
+      poiCursorActive.current = true;
+    } else if (poiCursorActive.current) {
+      canvas.style.cursor = '';
+      poiCursorActive.current = false;
+    }
+  }, []);
+
   const handleClick = useCallback(
     (e: MapMouseEvent) => {
       if (!onMapClick) return;
+
+      // Check if user clicked a Mapbox-rendered POI label (OSM data, zero network cost)
+      const features = e.target.queryRenderedFeatures(e.point, { layers: ['poi-label'] });
+      if (features.length > 0) {
+        const f = features[0];
+        const props = f.properties ?? {};
+        const osmVenue: OsmVenue = {
+          source: 'osm',
+          id: f.id != null ? `osm-${f.id}` : `osm-${props.name ?? 'unknown'}-${e.lngLat.lat.toFixed(5)}-${e.lngLat.lng.toFixed(5)}`,
+          name: props.name ?? 'Unknown venue',
+          location: { lat: e.lngLat.lat, lng: e.lngLat.lng },
+          category: props.class ?? props.type ?? 'place',
+        };
+        onMapClick({ lngLat: { lat: e.lngLat.lat, lng: e.lngLat.lng }, point: { x: e.point.x, y: e.point.y }, osmVenue });
+        return;
+      }
+
       onMapClick({ lngLat: { lat: e.lngLat.lat, lng: e.lngLat.lng }, point: { x: e.point.x, y: e.point.y } });
     },
     [onMapClick],
@@ -88,6 +119,7 @@ export default function MapView({ onBoundsChange, onMapClick, children }: MapVie
       mapboxAccessToken={MAPBOX_TOKEN}
       onLoad={handleLoad}
       onMoveEnd={handleMoveEnd}
+      onMouseMove={handleMouseMove}
       onClick={handleClick}
     >
       <Source id="fog" type="geojson" data={fogGeoJSON}>
