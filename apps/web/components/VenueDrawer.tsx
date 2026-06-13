@@ -17,7 +17,7 @@ const CROWD_EMOJI: Record<string, string> = {
 };
 
 interface Props {
-  onCreateParty?: (location: { lat: number; lng: number }) => void;
+  onCreateParty?: (location: { lat: number; lng: number }, source: 'google' | 'osm' | 'custom', venue_id: string | null) => void;
 }
 
 export default function VenueDrawer({ onCreateParty }: Props) {
@@ -81,7 +81,7 @@ export default function VenueDrawer({ onCreateParty }: Props) {
             {onCreateParty && (
               <div className="border-t pt-4">
                 <button
-                  onClick={() => { onCreateParty(osmVenue.location); dismiss(); }}
+                  onClick={() => { onCreateParty(osmVenue.location, 'osm', osmVenue.id); dismiss(); }}
                   className="w-full py-3 rounded-xl bg-gray-500/10 text-sm font-medium text-gray-600 hover:bg-gray-500/15 flex items-center justify-center gap-2"
                 >
                   🎉 Create watch party here
@@ -205,7 +205,12 @@ export default function VenueDrawer({ onCreateParty }: Props) {
             {onCreateParty && (
               <div className="border-t pt-4 mb-2">
                 <button
-                  onClick={() => { onCreateParty(place.location); setSelectedPlaceId(null); }}
+                  onClick={() => {
+                    const src = place.source === 'google' ? 'google' : (place.fanZone?.source ?? 'custom');
+                    const vid = place.source === 'google' ? place.id : (place.fanZone?.venue_id ?? null);
+                    onCreateParty(place.location, src, vid);
+                    setSelectedPlaceId(null);
+                  }}
                   className="w-full py-3 rounded-xl bg-gray-500/10 text-sm font-medium text-gray-600 hover:bg-gray-500/15 flex items-center justify-center gap-2"
                 >
                   🎉 Create watch party here
