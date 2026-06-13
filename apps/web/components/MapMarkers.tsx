@@ -30,7 +30,7 @@ export default function MapMarkers() {
           longitude={place.location.lng}
           latitude={place.location.lat}
           anchor="bottom"
-          onClick={() => setSelectedPlaceId(place.place_id)}
+          onClick={(e) => { e.originalEvent.stopPropagation(); setSelectedPlaceId(place.place_id); }}
         >
           <div
             style={{ backgroundColor: SOURCE_COLORS[place.source] }}
