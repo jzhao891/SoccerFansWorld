@@ -50,9 +50,7 @@ export function usePlacesSearch() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
-
         if (!res.ok) return;
-
         const data: PlacesResponse = await res.json();
         setPlaces(data.places);
       } finally {
