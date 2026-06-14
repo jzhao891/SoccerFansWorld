@@ -10,6 +10,8 @@
 
 - **Firestore security rules:** Currently all Firestore reads and writes are open. Add proper security rules: `live_statuses` and `venues` should require Auth for writes; read access can remain open. Watch party creation (`venues` collection) should only allow writes from authenticated users and enforce that `created_by` matches the requesting user's UID. Consider rate-limiting rules to prevent abuse.
 
+- **Mapbox token URL allowlist:** The `NEXT_PUBLIC_MAPBOX_TOKEN` is visible in the browser bundle. Restrict it to your domain in the Mapbox dashboard (Account → Access tokens → edit token → Allowed URLs) so it can't be used on other sites. Add both the Vercel preview URL and the custom domain once set up.
+
 - **Multiple watch parties at the same location:** Multiple FanZone docs can share the same `venue_id`, but `useMergedPlaces` currently surfaces one pin per location. Need to decide: (1) pin rendering — cluster badge with count, or offset overlapping pins radially; (2) drawer UX — tapping a cluster shows a list of all parties at that location before drilling into one.
 
 ---
