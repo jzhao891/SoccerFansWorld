@@ -9,7 +9,7 @@ Go to: `vercel.com/fandarai-s-projects/web/settings` → **General** → **Build
 | Setting | Value |
 |---|---|
 | **Root Directory** | *(leave blank — monorepo root)* |
-| **Build Command** | `npx turbo build --filter=@sfw/web` |
+| **Build Command** | `cd apps/web && npx next build` |
 | **Output Directory** | `apps/web/.next` |
 | **Install Command** | `npm install` |
 
@@ -27,9 +27,6 @@ Add in dashboard → **Environment Variables**:
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | Firebase Console | Public |
 | `NEXT_PUBLIC_MAPBOX_TOKEN` | mapbox.com → Account → Access tokens | Public — restrict to domain after deploy |
 | `GOOGLE_PLACES_API_KEY` | Google Cloud Console → APIs & Services → Credentials | Server-side only |
-| `FAL_KEY` | fal.ai dashboard | Optional — only needed for face-swap feature |
-| `HF_TOKEN` | huggingface.co/settings/tokens | Optional — only needed for face-swap feature |
-| `FACE_SWAP_PROVIDER` | `fal` or `hf` | Optional — only needed for face-swap feature |
 
 ### Deploy to production
 
