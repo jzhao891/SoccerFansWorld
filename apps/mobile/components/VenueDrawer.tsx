@@ -29,30 +29,40 @@ const CROWD_EMOJI: Record<string, string> = {
 };
 
 interface Props {
-  onCreateParty: (location: { lat: number; lng: number }) => void;
+  onCreateParty: (location: { lat: number; lng: number }, source: 'google' | 'osm' | 'custom', venue_id: string | null) => void;
 }
 
 export default function VenueDrawer({ onCreateParty }: Props) {
   const selectedPlaceId = useMapStore((s) => s.selectedPlaceId);
   const setSelectedPlaceId = useMapStore((s) => s.setSelectedPlaceId);
+  const selectedOsmVenue = useMapStore((s) => s.selectedOsmVenue);
+  const setSelectedOsmVenue = useMapStore((s) => s.setSelectedOsmVenue);
   const liveStatuses = useMapStore((s) => s.liveStatuses);
   const mergedPlaces = useMergedPlaces();
   const [saving, setSaving] = useState(false);
 
-  const place = mergedPlaces.find((p) => p.place_id === selectedPlaceId) ?? null;
+  const osmVenue = selectedOsmVenue;
+  const place = osmVenue ? null : (mergedPlaces.find((p) => p.id === selectedPlaceId) ?? null);
   const venueId = place?.fanZone?.id ?? null;
   const liveStatus = venueId ? liveStatuses[venueId] ?? null : null;
+
+  const isOpen = osmVenue !== null || place !== null;
+
+  function dismiss() {
+    setSelectedPlaceId(null);
+    setSelectedOsmVenue(null);
+  }
 
   const translateY = useRef(new Animated.Value(DRAWER_HEIGHT)).current;
 
   useEffect(() => {
     Animated.spring(translateY, {
-      toValue: place ? 0 : DRAWER_HEIGHT,
+      toValue: isOpen ? 0 : DRAWER_HEIGHT,
       useNativeDriver: true,
       bounciness: 0,
       speed: 14,
     }).start();
-  }, [place, translateY]);
+  }, [isOpen, translateY]);
 
   async function checkIn(patch: Partial<Pick<LiveStatus, 'crowd_index' | 'sound'>>) {
     if (!venueId) return;
@@ -67,65 +77,90 @@ export default function VenueDrawer({ onCreateParty }: Props) {
 
   return (
     <>
-      {place && (
-        <TouchableWithoutFeedback onPress={() => setSelectedPlaceId(null)}>
+      {isOpen && (
+        <TouchableWithoutFeedback onPress={dismiss}>
           <View style={[StyleSheet.absoluteFillObject, { bottom: DRAWER_HEIGHT }]} />
         </TouchableWithoutFeedback>
       )}
 
       <Animated.View style={[styles.drawer, { transform: [{ translateY }] }]}>
-        {place && (
-          <Pressable
-            style={({ pressed }) => [styles.hostBtn, pressed && styles.hostBtnPressed]}
-            onPress={() => onCreateParty(place.location)}
-          >
-            <Text style={styles.hostBtnText}>🎉  Host watch party here</Text>
-          </Pressable>
+        {/* OSM venue */}
+        {osmVenue && (
+          <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            <TouchableOpacity style={styles.handleArea} onPress={dismiss} activeOpacity={1}>
+              <View style={styles.handle} />
+            </TouchableOpacity>
+            <View style={styles.headerRow}>
+              <View style={styles.headerText}>
+                <Text style={styles.placeName}>{osmVenue.name}</Text>
+                <Text style={[styles.vicinity, { textTransform: 'capitalize' }]}>{osmVenue.category}</Text>
+              </View>
+              <TouchableOpacity onPress={dismiss} hitSlop={12}>
+                <Text style={styles.closeBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <Pressable
+              style={({ pressed }) => [styles.hostBtn, pressed && styles.hostBtnPressed]}
+              onPress={() => { onCreateParty(osmVenue.location, 'osm', osmVenue.id); dismiss(); }}
+            >
+              <Text style={styles.hostBtnText}>🎉  Host watch party here</Text>
+            </Pressable>
+          </ScrollView>
         )}
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <TouchableOpacity style={styles.handleArea} onPress={() => setSelectedPlaceId(null)} activeOpacity={1}>
-            <View style={styles.handle} />
-          </TouchableOpacity>
 
-          {place && (
-            <>
+        {/* Google / FanZone venue */}
+        {place && (
+          <>
+            <Pressable
+              style={({ pressed }) => [styles.hostBtn, pressed && styles.hostBtnPressed]}
+              onPress={() => {
+                const src = place.source === 'google' ? 'google' : (place.fanZone?.source ?? 'custom');
+                const vid = place.source === 'google' ? place.id : (place.fanZone?.venue_id ?? null);
+                onCreateParty(place.location, src, vid);
+              }}
+            >
+              <Text style={styles.hostBtnText}>🎉  Host watch party here</Text>
+            </Pressable>
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <TouchableOpacity style={styles.handleArea} onPress={dismiss} activeOpacity={1}>
+                <View style={styles.handle} />
+              </TouchableOpacity>
+
               {/* Header */}
               <View style={styles.headerRow}>
                 <View style={styles.headerText}>
                   <Text style={styles.placeName}>{place.name}</Text>
-                  {place.placeData?.vicinity && (
-                    <Text style={styles.vicinity}>{place.placeData.vicinity}</Text>
+                  {place.googleData?.vicinity && (
+                    <Text style={styles.vicinity}>{place.googleData.vicinity}</Text>
                   )}
                 </View>
-                <TouchableOpacity onPress={() => setSelectedPlaceId(null)} hitSlop={12}>
+                <TouchableOpacity onPress={dismiss} hitSlop={12}>
                   <Text style={styles.closeBtn}>✕</Text>
                 </TouchableOpacity>
               </View>
 
               {/* Meta row */}
               <View style={styles.metaRow}>
-                {place.placeData?.rating != null && (
-                  <Text style={styles.metaText}>⭐ {place.placeData.rating}</Text>
+                {place.googleData?.rating != null && (
+                  <Text style={styles.metaText}>⭐ {place.googleData.rating}</Text>
                 )}
-                {place.placeData?.open_now != null && (
-                  <Text style={[styles.metaText, place.placeData.open_now ? styles.openText : styles.closedText]}>
-                    {place.placeData.open_now ? 'Open now' : 'Closed'}
+                {place.googleData?.open_now != null && (
+                  <Text style={[styles.metaText, place.googleData.open_now ? styles.openText : styles.closedText]}>
+                    {place.googleData.open_now ? 'Open now' : 'Closed'}
                   </Text>
                 )}
                 <View style={[
                   styles.sourceBadge,
-                  place.source === 'merged' ? styles.sourceMerged :
-                  place.source === 'custom' ? styles.sourceCustom : styles.sourceGoogle,
+                  place.source === 'fanzone' ? styles.sourceMerged : styles.sourceGoogle,
                 ]}>
                   <Text style={[
                     styles.sourceBadgeText,
-                    place.source === 'merged' ? styles.sourceMergedText :
-                    place.source === 'custom' ? styles.sourceCustomText : styles.sourceGoogleText,
-                  ]}>{place.source}</Text>
+                    place.source === 'fanzone' ? styles.sourceMergedText : styles.sourceGoogleText,
+                  ]}>{place.source === 'fanzone' ? (place.fanZone?.source ?? 'fanzone') : 'google'}</Text>
                 </View>
               </View>
 
@@ -243,9 +278,9 @@ export default function VenueDrawer({ onCreateParty }: Props) {
                   </View>
                 </>
               )}
-            </>
-          )}
-        </ScrollView>
+            </ScrollView>
+          </>
+        )}
       </Animated.View>
     </>
   );
@@ -281,8 +316,6 @@ const styles = StyleSheet.create({
   sourceBadgeText: { fontSize: 11, fontWeight: '600' },
   sourceMerged: { backgroundColor: colors.mergedBg },
   sourceMergedText: { color: colors.mergedText },
-  sourceCustom: { backgroundColor: colors.customBg },
-  sourceCustomText: { color: colors.customText },
   sourceGoogle: { backgroundColor: colors.googleBg },
   sourceGoogleText: { color: colors.googleText },
   divider: { height: 1, backgroundColor: colors.borderLight, marginVertical: 14 },

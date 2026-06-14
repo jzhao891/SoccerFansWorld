@@ -1,4 +1,4 @@
-import type { PlaceResult } from './map';
+import type { GoogleVenue } from './map';
 
 export interface PlacesRequest {
   lat: number;
@@ -7,7 +7,7 @@ export interface PlacesRequest {
 }
 
 export interface PlacesResponse {
-  places: PlaceResult[];
+  places: GoogleVenue[];
 }
 
 export interface PlacesErrorResponse {

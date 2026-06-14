@@ -6,7 +6,7 @@
 
 - **Firestore security rules:** Currently all Firestore reads and writes are open. Add proper security rules: `live_statuses` and `venues` should require Auth for writes; read access can remain open. Watch party creation (`venues` collection) should only allow writes from authenticated users and enforce that `created_by` matches the requesting user's UID. Consider rate-limiting rules to prevent abuse.
 
-- **Multiple watch parties at the same location:** The current data model assumes one FanZone per Google Place (`google_place_id` as a bridge key). When multiple custom watch parties exist at or near the same point (e.g. two parties both hosted at the same bar), `useMergedPlaces` only surfaces one pin per location. Need to decide: (1) data model — allow multiple FanZone docs with the same `google_place_id` or same coordinates; (2) pin rendering — stack pins, show a cluster marker with a count badge, or offset overlapping pins; (3) drawer UX — when a clustered pin is tapped, show a list of all parties at that location before drilling into one. Perhaps display the nearest two or three events as a sorting mechanism.
+- **Multiple watch parties at the same location:** The current data model assumes one FanZone per Google Place (`google_place_id` as a bridge key). When multiple custom watch parties exist at or near the same point (e.g. two parties both hosted at the same bar), `useMergedPlaces` only surfaces one pin per location. Need to decide: (1) data model — allow multiple FanZone docs with the same `google_place_id` or same coordinates; (2) pin rendering — stack pins, show a cluster marker with a count badge, or offset overlapping pins; (3) drawer UX — when a clustered pin is tapped, show a list of all parties at that location before drilling into one. Perhaps display the nearest two or three events as a sorting mechanism; (4) shrink the size of subset of markers to make other ones more visible.
 
 ---
 
@@ -40,7 +40,11 @@
 
 - **Mobile UX polish — add image edit page and smooth navigation:** Build the image edit (fan card generator) screen in the mobile app and wire up navigation between the map screen and the image edit screen. Ensure transitions are smooth and the back navigation returns cleanly to the map.
 
+- **Marker density UX — zoom-responsive sizing to handle venue clusters:** As the user zooms in, markers at the same or nearby coordinates overlap and become hard to tap individually. Scale marker size inversely with zoom level so dense clusters shrink as the user zooms out, and grow as they zoom in to a specific area. For tightly co-located venues (e.g. multiple parties in the same building), consider offsetting overlapping pins radially or showing a cluster badge with a count. Tapping a cluster should expand it or show a list of co-located venues.
+
 ---
+
+- **Mobile Firestore persistence:** The Firebase JS SDK on React Native has no IndexedDB, so Firestore uses memory-only cache by default. Enabling persistence requires migrating to `@react-native-firebase/firestore` (native module, SQLite-backed). This involves a different API, EAS rebuild, and native module setup. Web already uses `persistentLocalCache()` via IndexedDB.
 
 ## 🟢 Low Importance / Low Urgency
 

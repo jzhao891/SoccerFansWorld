@@ -24,6 +24,8 @@ function MapScreen() {
   const [mapPressScreen, setMapPressScreen] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [createPartyOpen, setCreatePartyOpen] = useState(false);
   const [createPartyLocation, setCreatePartyLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [createPartySource, setCreatePartySource] = useState<'google' | 'osm' | 'custom'>('custom');
+  const [createPartyVenueId, setCreatePartyVenueId] = useState<string | null>(null);
   const suppressNextMapPress = useRef(false);
   const lastMapPressTime = useRef(0);
 
@@ -51,9 +53,15 @@ function MapScreen() {
     setMapPressPoint((prev) => (prev ? null : lngLat));
   }
 
-  function openCreateParty(location: { lat: number; lng: number }) {
+  function openCreateParty(
+    location: { lat: number; lng: number },
+    source: 'google' | 'osm' | 'custom' = 'custom',
+    venue_id: string | null = null,
+  ) {
     suppressNextMapPress.current = true;
     setCreatePartyLocation(location);
+    setCreatePartySource(source);
+    setCreatePartyVenueId(venue_id);
     setMapPressPoint(null);
     setCreatePartyOpen(true);
   }
@@ -78,6 +86,8 @@ function MapScreen() {
       <CreateWatchPartySheet
         visible={createPartyOpen}
         defaultLocation={createPartyLocation ?? undefined}
+        defaultSource={createPartySource}
+        defaultVenueId={createPartyVenueId}
         onClose={() => { setCreatePartyOpen(false); setCreatePartyLocation(null); }}
       />
       <StatusBar style="auto" />

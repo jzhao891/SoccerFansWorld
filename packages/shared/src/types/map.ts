@@ -13,8 +13,9 @@ export type BoundingBox = {
 };
 
 // A result from Google Places Nearby Search API
-export type PlaceResult = {
-  place_id: string;
+export type GoogleVenue = {
+  source: 'google';
+  id: string;
   name: string;
   location: LatLng;
   types: string[];
@@ -23,10 +24,26 @@ export type PlaceResult = {
   open_now?: boolean;
 };
 
+// A POI sourced from Mapbox vector tile (OpenStreetMap data)
+export type OsmVenue = {
+  source: 'osm';
+  id: string;
+  name: string;
+  location: LatLng;
+  category: string; // e.g. 'bar', 'restaurant', 'stadium'
+};
+
+export type Venue = GoogleVenue | OsmVenue;
+
 // A custom fan zone stored in Firestore (venues collection)
 export type FanZone = {
   id: string;
-  google_place_id: string | null; // Bridge key — null for standalone zones
+  // Provenance — where the FanZone was created from, stored in Firestore.
+  // Distinct from MergedPlace.source which controls map rendering.
+  // 'google': user tapped a Google venue dot; 'osm': user tapped a Mapbox POI label;
+  // 'custom': user tapped empty map with no source venue.
+  source: 'google' | 'osm' | 'custom';
+  venue_id: string | null; // Google place_id, OSM feature id, or null for custom
   name: string;
   location: LatLng;
   geohash: string;
@@ -50,13 +67,16 @@ export type LiveStatus = {
   updated_at: number;        // Unix timestamp ms
 };
 
-// The merged result rendered on the map
+// The merged result rendered on the map.
+// source 'osm' is intentionally absent — OSM venues are rendered by Mapbox as POI labels
+// and never added to our marker layer. They surface transiently via selectedOsmVenue in
+// the store when tapped, not as persistent MergedPlace entries.
 export type MergedPlace = {
-  place_id: string;
+  id: string;
   name: string;
   location: LatLng;
-  source: 'google' | 'custom' | 'merged';
-  placeData?: PlaceResult;
+  source: 'google' | 'fanzone';
+  googleData?: GoogleVenue;
   fanZone?: FanZone;
   liveStatus?: LiveStatus;
 };
