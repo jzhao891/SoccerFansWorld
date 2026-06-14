@@ -1,12 +1,13 @@
-import type { PlaceResult } from '@sfw/shared';
+import type { GoogleVenue } from '@sfw/shared';
 
 const PLACES_API_URL = 'https://places.googleapis.com/v1/places:searchNearby';
 const API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY ?? '';
 const USE_MOCK = process.env.EXPO_PUBLIC_USE_MOCK_PLACES === 'true';
 
-const MOCK_PLACES: PlaceResult[] = [
+const MOCK_PLACES: GoogleVenue[] = [
   {
-    place_id: 'mock-lumen-field',
+    source: 'google',
+    id: 'mock-lumen-field',
     name: 'Lumen Field',
     location: { lat: 47.5952, lng: -122.3316 },
     types: ['stadium'],
@@ -15,7 +16,8 @@ const MOCK_PLACES: PlaceResult[] = [
     open_now: true,
   },
   {
-    place_id: 'mock-climate-pledge',
+    source: 'google',
+    id: 'mock-climate-pledge',
     name: 'Climate Pledge Arena',
     location: { lat: 47.6218, lng: -122.3542 },
     types: ['stadium'],
@@ -24,7 +26,8 @@ const MOCK_PLACES: PlaceResult[] = [
     open_now: true,
   },
   {
-    place_id: 'mock-pike-pub',
+    source: 'google',
+    id: 'mock-pike-pub',
     name: 'Pike Pub & Brewery',
     location: { lat: 47.6089, lng: -122.3402 },
     types: ['bar', 'restaurant'],
@@ -33,7 +36,8 @@ const MOCK_PLACES: PlaceResult[] = [
     open_now: true,
   },
   {
-    place_id: 'mock-pyramid-ale',
+    source: 'google',
+    id: 'mock-pyramid-ale',
     name: 'Pyramid Alehouse',
     location: { lat: 47.5958, lng: -122.3308 },
     types: ['bar', 'restaurant'],
@@ -42,7 +46,8 @@ const MOCK_PLACES: PlaceResult[] = [
     open_now: true,
   },
   {
-    place_id: 'mock-chipper',
+    source: 'google',
+    id: 'mock-chipper',
     name: 'The Chipper Truck Cafe',
     location: { lat: 47.6062, lng: -122.3321 },
     types: ['restaurant'],
@@ -52,7 +57,7 @@ const MOCK_PLACES: PlaceResult[] = [
   },
 ];
 
-export async function searchNearby(lat: number, lng: number, radiusMeters = 2000): Promise<PlaceResult[]> {
+export async function searchNearby(lat: number, lng: number, radiusMeters = 2000): Promise<GoogleVenue[]> {
   if (USE_MOCK) return MOCK_PLACES;
   const res = await fetch(PLACES_API_URL, {
     method: 'POST',
@@ -77,11 +82,12 @@ export async function searchNearby(lat: number, lng: number, radiusMeters = 2000
   if (!res.ok) return [];
 
   const data = await res.json();
-  return (data.places ?? []).map((p: Record<string, unknown>): PlaceResult => {
+  return (data.places ?? []).map((p: Record<string, unknown>): GoogleVenue => {
     const loc = p.location as { latitude: number; longitude: number } | undefined;
     const display = p.displayName as { text?: string } | undefined;
     return {
-      place_id: p.id as string,
+      source: 'google',
+      id: p.id as string,
       name: display?.text ?? '',
       location: { lat: loc?.latitude ?? 0, lng: loc?.longitude ?? 0 },
       types: (p.types as string[]) ?? [],

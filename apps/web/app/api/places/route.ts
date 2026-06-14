@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { PlaceResult, PlacesRequest, PlacesResponse, PlacesErrorResponse } from '@sfw/shared';
+import type { GoogleVenue, PlacesRequest, PlacesResponse, PlacesErrorResponse } from '@sfw/shared';
 import { MOCK_SEATTLE_PLACES } from '@/lib/mockPlacesData';
 
 const PLACES_API_BASE = 'https://places.googleapis.com/v1/places:searchNearby';
@@ -52,14 +52,15 @@ export async function POST(req: NextRequest): Promise<NextResponse<PlacesRespons
     const loc = p.location as { latitude: number; longitude: number } | undefined;
     const display = p.displayName as { text?: string } | undefined;
     return {
-      place_id: p.id as string,
+      source: 'google',
+      id: p.id as string,
       name: display?.text ?? '',
       location: { lat: loc?.latitude ?? 0, lng: loc?.longitude ?? 0 },
       types: (p.types as string[]) ?? [],
       vicinity: p.formattedAddress as string | undefined,
       rating: p.rating as number | undefined,
       open_now: (p.currentOpeningHours as { openNow?: boolean } | undefined)?.openNow,
-    } satisfies PlaceResult;
+    } satisfies GoogleVenue;
   });
 
   return NextResponse.json({ places });

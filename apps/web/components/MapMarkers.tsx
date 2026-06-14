@@ -6,9 +6,8 @@ import { useMapStore } from '@/store/mapStore';
 import type { MergedPlace } from '@sfw/shared';
 
 const SOURCE_COLORS: Record<MergedPlace['source'], string> = {
-  google: '#3B82F6',   // blue
-  custom: '#F97316',   // orange
-  merged: '#22C55E',   // green
+  google:  '#3B82F6',  // blue — Google place with no FanZone
+  fanzone: '#F97316',  // orange — user-created FanZone (any origin)
 };
 
 export default function MapMarkers() {
@@ -26,11 +25,11 @@ export default function MapMarkers() {
     <>
       {visiblePlaces.map((place) => (
         <Marker
-          key={place.place_id}
+          key={place.id}
           longitude={place.location.lng}
           latitude={place.location.lat}
           anchor="bottom"
-          onClick={(e) => { e.originalEvent.stopPropagation(); setSelectedPlaceId(place.place_id); }}
+          onClick={(e) => { e.originalEvent.stopPropagation(); setSelectedPlaceId(place.id); }}
         >
           <div
             style={{ backgroundColor: SOURCE_COLORS[place.source] }}

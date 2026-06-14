@@ -67,7 +67,13 @@ export function useVenueSubscription() {
 
       const unsub = onSnapshot(q, (snapshot) => {
         snapshot.docChanges().forEach((change) => {
-          const venue = { id: change.doc.id, ...change.doc.data() } as FanZone;
+          const data = change.doc.data();
+          // Backward compat: old docs have google_place_id instead of source/venue_id
+          if (data.google_place_id !== undefined && data.source === undefined) {
+            data.source = data.google_place_id ? 'google' : 'custom';
+            data.venue_id = data.google_place_id ?? null;
+          }
+          const venue = { id: change.doc.id, ...data } as FanZone;
           if (change.type === 'removed') {
             venueMap.delete(venue.id);
             unsubscribeFromLiveStatus(venue.id);

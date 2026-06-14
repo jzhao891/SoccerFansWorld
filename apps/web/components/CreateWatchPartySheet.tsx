@@ -11,6 +11,8 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   defaultLocation?: { lat: number; lng: number };
+  defaultSource?: 'google' | 'osm' | 'custom';
+  defaultVenueId?: string | null;
 }
 
 function defaultKickoffValue() {
@@ -19,7 +21,7 @@ function defaultKickoffValue() {
   return d.toISOString().slice(0, 16);
 }
 
-export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation }: Props) {
+export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation, defaultSource, defaultVenueId }: Props) {
   const viewState = useMapStore((s) => s.viewState);
 
   const [partyName, setPartyName] = useState('');
@@ -67,7 +69,8 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
     try {
       const ref = doc(collection(db, 'venues'));
       await setDoc(ref, {
-        google_place_id: null,
+        source: defaultSource ?? 'custom',
+        venue_id: defaultVenueId ?? null,
         name: partyName.trim(),
         event_title: eventTitle.trim(),
         ...(description.trim() ? { description: description.trim() } : {}),
