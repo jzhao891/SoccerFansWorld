@@ -17,6 +17,8 @@ Go to: `vercel.com/fandarai-s-projects/web/settings` → **General** → **Build
 
 Add in dashboard → **Environment Variables**:
 
+> **Note:** Variables prefixed with `NEXT_PUBLIC_` are embedded into the browser bundle at build time and are visible to anyone — do not put secrets in them. Use them only for values that are designed to be public (Firebase client config, Mapbox token). All other variables are server-side only.
+
 | Variable | Source | Notes |
 |---|---|---|
 | `NEXT_PUBLIC_FIREBASE_API_KEY` | Firebase Console → Project Settings → Web app | Public |
@@ -25,7 +27,7 @@ Add in dashboard → **Environment Variables**:
 | `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | Firebase Console | Public |
 | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Firebase Console | Public |
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | Firebase Console | Public |
-| `NEXT_PUBLIC_MAPBOX_TOKEN` | mapbox.com → Account → Access tokens | Public — restrict to domain after deploy |
+| `NEXT_PUBLIC_MAPBOX_TOKEN` | mapbox.com → Account → Access tokens | Public |
 | `GOOGLE_PLACES_API_KEY` | Google Cloud Console → APIs & Services → Credentials | Server-side only |
 
 ### Deploy to production
@@ -33,12 +35,6 @@ Add in dashboard → **Environment Variables**:
 ```bash
 cd apps/web && npx vercel --prod
 ```
-
-### Post-deploy security checklist
-
-- [ ] Restrict Mapbox token to production domain: mapbox.com → Account → Access tokens → edit → Allowed URLs
-- [ ] Restrict Google Places API key to production domain: Google Cloud Console → APIs & Services → Credentials → HTTP referrers
-- [ ] Add Firestore security rules (see BACKLOGS.md)
 
 ---
 
