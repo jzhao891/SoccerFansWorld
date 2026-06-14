@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect, beforeEach } from 'vitest';
 import MapStatusOverlay from '@/components/MapStatusOverlay';
 import { useMapStore } from '@/store/mapStore';
-import type { FanZone, PlaceResult } from '@sfw/shared';
+import type { GoogleVenue, FanZone } from '@sfw/shared';
 
 const initialState = useMapStore.getState();
 
@@ -12,11 +12,12 @@ beforeEach(() => {
 
 // Bounds inside Seattle allowed region
 const seattleBounds = { north: 47.65, south: 47.55, east: -122.25, west: -122.40 };
-// Bounds well outside all allowed regions (NYC)
+// Bounds well outside all allowed regions
 const outsideBounds = { north: 51.6, south: 51.4, east: 0.2, west: -0.3 }; // London — not a host city
 
-const mockPlace: PlaceResult = {
-  place_id: 'gp_001',
+const mockPlace: GoogleVenue = {
+  source: 'google',
+  id: 'gp_001',
   name: 'The Pub',
   location: { lat: 47.6, lng: -122.3 },
   types: ['bar'],
@@ -24,7 +25,8 @@ const mockPlace: PlaceResult = {
 
 const mockFanZone: FanZone = {
   id: 'fz_001',
-  google_place_id: 'gp_001',
+  source: 'google',
+  venue_id: 'gp_001',
   name: 'The Pub',
   location: { lat: 47.6, lng: -122.3 },
   geohash: 'c23nb',
