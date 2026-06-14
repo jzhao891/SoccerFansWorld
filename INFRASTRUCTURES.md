@@ -69,3 +69,56 @@ GOOGLE_PLACES_API_KEY=
 ```
 NEXT_PUBLIC_MAPBOX_TOKEN=
 ```
+
+---
+
+## Domain & DNS Setup (Cloudflare → Route 53 → Vercel)
+
+**Domain:** `fandar.ai`
+**Registrar:** Cloudflare
+**DNS authority:** AWS Route 53
+**Hosting:** Vercel
+
+Because Cloudflare Registrar mandates using its own authoritative infrastructure, DNS is delegated from Cloudflare to Route 53, which then routes to Vercel.
+
+### Phase 1 — Create Route 53 Hosted Zone
+
+1. Log into AWS Console → Route 53 → **Hosted zones** → **Create hosted zone**
+2. Domain name: `fandar.ai` | Type: **Public hosted zone** → Create
+3. Copy the 4 auto-generated NS record values (e.g. `ns-282.awsdns-35.com`) — exclude the trailing dot
+
+### Phase 2 — Add Vercel DNS Records in Route 53
+
+Inside the `fandar.ai` hosted zone:
+
+**Apex record:**
+- Record name: *(blank)*
+- Type: `A`
+- Value: `76.76.21.21`
+
+**www subdomain:**
+- Record name: `www`
+- Type: `CNAME`
+- Value: `cname.vercel-dns.com`
+
+### Phase 3 — Delegate DNS from Cloudflare to Route 53
+
+In Cloudflare dashboard → `fandar.ai` → **DNS → Records**, add NS records delegating to Route 53:
+
+**Root delegation** — add all 4 Route 53 nameservers as separate NS records:
+- Type: `NS` | Name: `@` | Content: `<ns-1.awsdns-xx.com>`
+- Repeat for all 4 nameservers
+
+**www delegation** — same 4 nameservers, Name: `www`:
+- Type: `NS` | Name: `www` | Content: `<ns-1.awsdns-xx.com>`
+- Repeat for all 4 nameservers
+
+### Phase 4 — Add Domain in Vercel
+
+```bash
+vercel domains add www.fandar.ai
+```
+
+Or via dashboard: Settings → Domains → add `www.fandar.ai`. When prompted, select the recommended redirect (fandar.ai → www.fandar.ai).
+
+Vercel will detect the Route 53 delegation, mark the domain **Active**, and auto-issue the SSL certificate.
