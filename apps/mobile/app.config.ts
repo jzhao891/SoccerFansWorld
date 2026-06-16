@@ -3,7 +3,8 @@ import type { ExpoConfig, ConfigContext } from 'expo/config';
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'Fandar AI',
-  slug: 'fandar-ai',
+  slug: 'fandarai',
+  owner: 'fandarai',
   version: '1.0.0',
   orientation: 'portrait',
   icon: '../../packages/shared/assets/logo.png',
@@ -45,7 +46,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ],
   extra: {
     eas: {
-      projectId: '9176b5bb-e65a-4a0e-b974-e05862b4a2bc',
+      projectId: 'a8ec8d1e-5ef1-41ec-9e26-99b2da2c2d72',
     },
   },
 });
