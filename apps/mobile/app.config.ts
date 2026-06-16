@@ -2,21 +2,21 @@ import type { ExpoConfig, ConfigContext } from 'expo/config';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: 'Soccer Fans World',
-  slug: 'soccerfansworld',
+  name: 'Fandar AI',
+  slug: 'fandar-ai',
   version: '1.0.0',
   orientation: 'portrait',
-  icon: './assets/icon.png',
+  icon: '../../packages/shared/assets/logo.png',
   userInterfaceStyle: 'light',
   ios: {
     supportsTablet: true,
-    bundleIdentifier: 'com.soccerfansworld.app',
+    bundleIdentifier: 'ai.fandar.app',
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
     },
   },
   android: {
-    package: 'com.soccerfansworld.app',
+    package: 'ai.fandar.app',
     adaptiveIcon: {
       backgroundColor: '#E6F4FE',
       foregroundImage: './assets/android-icon-foreground.png',
