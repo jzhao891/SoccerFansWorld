@@ -2,7 +2,7 @@ import type { ExpoConfig, ConfigContext } from 'expo/config';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: 'Fandar AI',
+  name: 'FandarAI',
   slug: 'fandarai',
   owner: 'fandarai',
   version: '1.0.0',
