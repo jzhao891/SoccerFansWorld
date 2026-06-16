@@ -12,6 +12,10 @@
 
 - **Mapbox token URL allowlist:** The `NEXT_PUBLIC_MAPBOX_TOKEN` is visible in the browser bundle. Restrict it to your domain in the Mapbox dashboard (Account → Access tokens → edit token → Allowed URLs) so it can't be used on other sites. Add both the Vercel preview URL and the custom domain once set up.
 
+- **Apple Sign in with Apple — complete Service ID configuration:** Blocked until the iOS App ID (bundle ID) is registered. See `INFRASTRUCTURES.md` → Firebase Auth → Step 4 for the exact steps to complete.
+
+- **Support page (`fandar.ai/support`):** Create `apps/web/app/support/page.tsx` with contact email (`footballfansworld.labs@gmail.com`), data deletion request instructions, and basic FAQ. Required by both App Store and Play Store — referenced in the privacy policy.
+
 - **Multiple watch parties at the same location:** Multiple FanZone docs can share the same `venue_id`, but `useMergedPlaces` currently surfaces one pin per location. Need to decide: (1) pin rendering — cluster badge with count, or offset overlapping pins radially; (2) drawer UX — tapping a cluster shows a list of all parties at that location before drilling into one.
 
 ---
