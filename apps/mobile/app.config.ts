@@ -2,21 +2,27 @@ import type { ExpoConfig, ConfigContext } from 'expo/config';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: 'Soccer Fans World',
-  slug: 'soccerfansworld',
+  name: 'FandarAI',
+  slug: 'fandarai',
+  owner: 'fandarai',
   version: '1.0.0',
   orientation: 'portrait',
-  icon: './assets/icon.png',
+  icon: '../../packages/shared/assets/logo.png',
+  splash: {
+    image: '../../packages/shared/assets/logo.png',
+    resizeMode: 'contain',
+    backgroundColor: '#FFFFFF',
+  },
   userInterfaceStyle: 'light',
   ios: {
     supportsTablet: true,
-    bundleIdentifier: 'com.soccerfansworld.app',
+    bundleIdentifier: 'ai.fandar.app',
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
     },
   },
   android: {
-    package: 'com.soccerfansworld.app',
+    package: 'ai.fandar.app',
     adaptiveIcon: {
       backgroundColor: '#E6F4FE',
       foregroundImage: './assets/android-icon-foreground.png',
@@ -34,13 +40,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-location',
       {
-        locationWhenInUsePermission: 'Allow Soccer Fans World to use your location to set your watch party meeting point.',
+        locationWhenInUsePermission: 'Allow Fandar AI to use your location to find fan venues near you.',
       },
     ],
   ],
   extra: {
     eas: {
-      projectId: '9176b5bb-e65a-4a0e-b974-e05862b4a2bc',
+      projectId: 'a8ec8d1e-5ef1-41ec-9e26-99b2da2c2d72',
     },
   },
 });

@@ -31,5 +31,10 @@ yarn-error.log*
 .env
 .env*.local
 
+# one-time setup docs (contains account details — keep local only)
+ONETIME_SETUP.md
+
 # typescript
 *.tsbuildinfo
+.vercel
+.env*
