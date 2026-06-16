@@ -72,53 +72,57 @@ NEXT_PUBLIC_MAPBOX_TOKEN=
 
 ---
 
-## Domain & DNS Setup (Cloudflare → Route 53 → Vercel)
+## Domain & DNS Setup (Cloudflare → Vercel)
 
 **Domain:** `fandar.ai`
 **Registrar:** Cloudflare
-**DNS authority:** AWS Route 53
+**DNS authority:** Cloudflare (direct — no Route 53 needed)
 **Hosting:** Vercel
 
-Because Cloudflare Registrar mandates using its own authoritative infrastructure, DNS is delegated from Cloudflare to Route 53, which then routes to Vercel.
+> Note: Route 53 is not needed. Cloudflare DNS is free, fast, and sufficient for Vercel hosting.
 
-### Phase 1 — Create Route 53 Hosted Zone
-
-1. Log into AWS Console → Route 53 → **Hosted zones** → **Create hosted zone**
-2. Domain name: `fandar.ai` | Type: **Public hosted zone** → Create
-3. Copy the 4 auto-generated NS record values (e.g. `ns-282.awsdns-35.com`) — exclude the trailing dot
-
-### Phase 2 — Add Vercel DNS Records in Route 53
-
-Inside the `fandar.ai` hosted zone:
-
-**Apex record:**
-- Record name: *(blank)*
-- Type: `A`
-- Value: `76.76.21.21`
-
-**www subdomain:**
-- Record name: `www`
-- Type: `CNAME`
-- Value: `cname.vercel-dns.com`
-
-### Phase 3 — Delegate DNS from Cloudflare to Route 53
-
-In Cloudflare dashboard → `fandar.ai` → **DNS → Records**, add NS records delegating to Route 53:
-
-**Root delegation** — add all 4 Route 53 nameservers as separate NS records:
-- Type: `NS` | Name: `@` | Content: `<ns-1.awsdns-xx.com>`
-- Repeat for all 4 nameservers
-
-**www delegation** — same 4 nameservers, Name: `www`:
-- Type: `NS` | Name: `www` | Content: `<ns-1.awsdns-xx.com>`
-- Repeat for all 4 nameservers
-
-### Phase 4 — Add Domain in Vercel
+### Step 1 — Add domains to Vercel
 
 ```bash
+vercel domains add fandar.ai
 vercel domains add www.fandar.ai
 ```
 
-Or via dashboard: Settings → Domains → add `www.fandar.ai`. When prompted, select the recommended redirect (fandar.ai → www.fandar.ai).
+### Step 2 — Auto-configure DNS via Vercel
 
-Vercel will detect the Route 53 delegation, mark the domain **Active**, and auto-issue the SSL certificate.
+Vercel dashboard → `https://vercel.com/fandarai-s-projects/web/settings/domains` → click a domain showing "DNS Change Recommended" → **Auto Configure** → **Authorize**.
+
+Vercel will add a TXT verification record and a CNAME record directly to Cloudflare. Repeat for both domains. Both should show green/active within minutes.
+
+---
+
+## Firebase Auth
+
+**Console:** https://console.firebase.google.com → `footballfansworld-d532e` → Authentication
+
+### Step 1 — Initialize Authentication [DONE]
+Firebase Console → Authentication → **Get started**
+
+### Step 2 — Enable providers [DONE]
+Firebase Console → Authentication → **Sign-in method**
+
+- [DONE] **Email/Password** → toggle on → Save
+- [DONE] **Google** → toggle on → set support email (`smin.lee5234@gmail.com`) → Save
+- [ ] **Apple** → blocked until iOS App ID exists (see backlog)
+
+### Step 3 — Add authorized domain [DONE]
+Firebase Console → Authentication → **Settings** → **Authorized domains** → Add `fandar.ai`
+
+### Step 4 — Apple Sign-in setup [ ] *(blocked — no iOS App ID yet)*
+Complete once iOS App ID (bundle ID) is registered:
+
+1. **Apple Developer** → Identifiers → `ai.fandar.web` (Service ID already created) → enable **Sign in with Apple** → Configure:
+   - Primary App ID: select the iOS App ID once registered
+   - Domains: `fandar.ai`
+   - Return URL: `https://footballfansworld-d532e.firebaseapp.com/__/auth/handler`
+2. **Apple Developer** → Keys → + → enable **Sign in with Apple** → Configure → select Primary App ID → Download `.p8` key file (once only) → note the **Key ID** and **Team ID** (top-right of Apple Developer dashboard)
+3. **Firebase Console** → Authentication → Sign-in method → **Apple** → fill in:
+   - Services ID: `ai.fandar.web`
+   - Apple Team ID: *(from step 2)*
+   - Key ID: *(from step 2)*
+   - Private key: *(contents of `.p8` file)*

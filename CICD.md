@@ -2,16 +2,7 @@
 
 ## Web — Vercel Production Deployment
 
-### One-time Vercel dashboard setup
-
-Go to: `vercel.com/fandarai-s-projects/web/settings` → **General** → **Build & Development Settings**
-
-| Setting | Value |
-|---|---|
-| **Root Directory** | *(leave blank — monorepo root)* |
-| **Build Command** | `cd apps/web && npx next build` |
-| **Output Directory** | `apps/web/.next` |
-| **Install Command** | `npm install` |
+> Build settings are version-controlled in `vercel.json` at the repo root — no manual dashboard configuration needed.
 
 ### Environment variables
 
