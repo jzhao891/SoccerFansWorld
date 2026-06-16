@@ -7,6 +7,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   version: '1.0.0',
   orientation: 'portrait',
   icon: '../../packages/shared/assets/logo.png',
+  splash: {
+    image: '../../packages/shared/assets/logo.png',
+    resizeMode: 'contain',
+    backgroundColor: '#FFFFFF',
+  },
   userInterfaceStyle: 'light',
   ios: {
     supportsTablet: true,
@@ -34,7 +39,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-location',
       {
-        locationWhenInUsePermission: 'Allow Soccer Fans World to use your location to set your watch party meeting point.',
+        locationWhenInUsePermission: 'Allow Fandar AI to use your location to find fan venues near you.',
       },
     ],
   ],
