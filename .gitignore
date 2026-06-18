@@ -38,3 +38,6 @@ ONETIME_SETUP.md
 *.tsbuildinfo
 .vercel
 .env*
+
+# claude local notes (machine-specific, never commit)
+CLAUDE.local.md
