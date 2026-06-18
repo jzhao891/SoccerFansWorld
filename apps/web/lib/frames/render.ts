@@ -1,21 +1,18 @@
 import { readFile } from "fs/promises";
 import { join } from "path";
-import sharp from "sharp";
 import type { FrameRenderRequest, FrameTemplate, TemplateLayer } from "@sfw/shared";
-import { composite, type CompositeLayer } from "./compositor";
+import { composite, type CompositeLayer } from "../compose/compositor";
+import { watermarkSvg } from "../compose/watermark";
+import { textSvg } from "../compose/text";
+import { applyTierResolution, watermarkVisible } from "../compose/tier";
 import { getTemplate, resolveAssetSrc } from "./catalog";
-import { watermarkSvg } from "./watermark";
-import { textSvg } from "./text";
 
 // Server-only orchestrator: turns a FrameRenderRequest into a finished PNG by
 // resolving each template layer against the request (selected assets, uploaded
-// photo, text inputs) and feeding the result to the generic compositor. Owns
-// the free/hd tier policy (watermark + resolution).
+// photo, text inputs) and feeding the result to the generic compositor. The
+// free/hd tier policy is the shared one in compose/tier.
 
 const PUBLIC_DIR = join(process.cwd(), "public");
-
-// Free downloads are deliberately small; hd is full canvas resolution.
-const FREE_MAX_WIDTH = 640;
 
 async function readPublic(src: string): Promise<Buffer> {
   return readFile(join(PUBLIC_DIR, src.replace(/^\/+/, "")));
@@ -55,7 +52,7 @@ async function toCompositeLayer(
       return { input: textSvg(value, layer.rect, layer.style), rect: layer.rect, fit: "fill" };
     }
     case "watermark": {
-      if (req.tier !== "free") return null;
+      if (!watermarkVisible(req.tier)) return null;
       return {
         input: watermarkSvg(template.size),
         rect: { x: 0, y: 0, w: template.size.w, h: template.size.h },
@@ -75,10 +72,6 @@ export async function renderFrame(req: FrameRenderRequest): Promise<Buffer> {
   );
   const layers = resolved.filter((l): l is CompositeLayer => l !== null);
 
-  let out = await composite(template.size, layers);
-
-  if (req.tier === "free" && template.size.w > FREE_MAX_WIDTH) {
-    out = await sharp(out).resize(FREE_MAX_WIDTH).png().toBuffer();
-  }
-  return out;
+  const out = await composite(template.size, layers);
+  return applyTierResolution(out, req.tier, template.size.w);
 }
