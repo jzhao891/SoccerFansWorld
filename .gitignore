@@ -34,6 +34,12 @@ yarn-error.log*
 # one-time setup docs (contains account details — keep local only)
 ONETIME_SETUP.md
 
+# seed script logs
+/logs/*.log
+
+# venue seed data (contains Google Places IDs — keep local only)
+packages/shared/src/scripts/resources/venues*.json
+
 # typescript
 *.tsbuildinfo
 .vercel
