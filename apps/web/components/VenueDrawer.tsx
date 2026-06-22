@@ -1,8 +1,5 @@
 'use client';
 
-import { useState } from 'react';
-import { doc, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { useMapStore } from '@/store/mapStore';
 import { useMergedPlaces } from '@/hooks/useMergedPlaces';
 import type { FanZone, LiveStatus } from '@sfw/shared';
@@ -44,7 +41,7 @@ function isToday(ms?: number): boolean {
 }
 
 interface Props {
-  onCreateParty?: (location: { lat: number; lng: number }, source: 'google' | 'osm' | 'custom', venue_id: string | null) => void;
+  onCreateParty?: (location: { lat: number; lng: number }, source: 'google' | 'osm' | 'custom', venue_id: string | null, address?: string) => void;
 }
 
 export default function VenueDrawer({ onCreateParty }: Props) {
@@ -54,7 +51,6 @@ export default function VenueDrawer({ onCreateParty }: Props) {
   const setSelectedOsmVenue = useMapStore((s) => s.setSelectedOsmVenue);
   const liveStatuses = useMapStore((s) => s.liveStatuses);
   const mergedPlaces = useMergedPlaces();
-  const [saving, setSaving] = useState(false);
 
   const osmVenue = selectedOsmVenue;
   const place = osmVenue ? null : (mergedPlaces.find((p) => p.id === selectedPlaceId) ?? null);
@@ -64,17 +60,6 @@ export default function VenueDrawer({ onCreateParty }: Props) {
   const venueId = rep ? (rep.venue_id ?? rep.id) : null;
   const liveStatus = venueId ? liveStatuses[venueId] ?? null : null;
 
-  async function checkIn(patch: Partial<Pick<LiveStatus, 'crowd_index' | 'sound'>>) {
-    if (!venueId) return;
-    setSaving(true);
-    await setDoc(
-      doc(db, 'live_statuses', venueId),
-      { venue_id: venueId, ...liveStatus, ...patch, updated_at: Date.now() },
-      { merge: true },
-    );
-    setSaving(false);
-  }
-
   const isOpen = osmVenue !== null || place !== null;
 
   function dismiss() {
@@ -83,11 +68,16 @@ export default function VenueDrawer({ onCreateParty }: Props) {
   }
 
   return (
-    <div
-      className={`fixed top-4 left-4 z-20 w-[380px] max-w-[calc(100%-2rem)] max-h-[calc(100%-2rem)] overflow-y-auto bg-white rounded-2xl shadow-2xl transition-transform duration-300 ease-in-out ${
-        isOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1.5rem)]'
-      }`}
-    >
+    <>
+      {/* Transparent click-catcher: a click anywhere dismisses the panel (map stays visible).
+          The next click then reaches the map and drops a pin / opens the relevant panel. */}
+      {isOpen && <div className="fixed inset-0 z-10" onClick={dismiss} />}
+
+      <div
+        className={`fixed top-4 left-4 z-20 w-[380px] max-w-[calc(100%-2rem)] max-h-[calc(100%-2rem)] overflow-y-auto bg-white rounded-2xl shadow-2xl transition-transform duration-300 ease-in-out ${
+          isOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1.5rem)]'
+        }`}
+      >
       {/* OSM venue — name and category only */}
       {osmVenue && (
         <div className="p-5">
@@ -143,7 +133,9 @@ export default function VenueDrawer({ onCreateParty }: Props) {
               onClick={() => {
                 const src = place.source === 'google' ? 'google' : (rep?.source ?? 'custom');
                 const vid = place.source === 'google' ? place.id : (rep?.venue_id ?? null);
-                onCreateParty(place.location, src, vid);
+                // Google place + existing fan zone already carry an address — reuse it (no geocode).
+                const addr = place.source === 'google' ? place.googleData?.vicinity : rep?.address;
+                onCreateParty(place.location, src, vid, addr);
                 setSelectedPlaceId(null);
               }}
               className="px-4 py-2 rounded-lg bg-gray-900/80 text-xs font-semibold text-white hover:bg-gray-900/90 cursor-pointer mb-4"
@@ -225,47 +217,40 @@ export default function VenueDrawer({ onCreateParty }: Props) {
                   </a>
                 )}
 
-                {/* Check-in — only for events happening today */}
+                {/* Check-in — only for events happening today.
+                    Disabled until auth lands (check-in/RSVP require a signed-in user). */}
                 {today && venueId && (
                   <div className="mt-3 pt-3 border-t border-gray-100">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                      Check in {saving && <span className="font-normal normal-case">Saving…</span>}
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                      Check in <span className="font-normal normal-case">(sign in required)</span>
                     </p>
 
-                    <p className="text-xs text-gray-500 mb-1.5">How&apos;s the crowd?</p>
-                    <div className="flex gap-1.5 mb-3">
-                      {CROWD_OPTIONS.map((option) => {
-                        const selected = liveStatus?.crowd_index === option;
-                        return (
+                    <div className="opacity-50 pointer-events-none select-none" aria-disabled="true">
+                      <p className="text-xs text-gray-400 mb-1.5">How&apos;s the crowd?</p>
+                      <div className="flex gap-1.5 mb-3">
+                        {CROWD_OPTIONS.map((option) => (
                           <button
                             key={option}
-                            onClick={() => checkIn({ crowd_index: option })}
-                            disabled={saving}
-                            style={{ backgroundColor: selected ? '#111827' : '#fff', color: selected ? '#fff' : '#374151' }}
-                            className="flex-1 py-2 rounded-lg text-xs font-medium border border-gray-200 transition-colors"
+                            disabled
+                            className="flex-1 py-2 rounded-lg text-xs font-medium border border-gray-200 bg-white text-gray-400"
                           >
                             {CROWD_EMOJI[option!]} {option}
                           </button>
-                        );
-                      })}
-                    </div>
+                        ))}
+                      </div>
 
-                    <p className="text-xs text-gray-500 mb-1.5">Screen sound on?</p>
-                    <div className="flex gap-1.5">
-                      {(['On', 'Off'] as const).map((option) => {
-                        const selected = liveStatus?.sound === option;
-                        return (
+                      <p className="text-xs text-gray-400 mb-1.5">Screen sound on?</p>
+                      <div className="flex gap-1.5">
+                        {(['On', 'Off'] as const).map((option) => (
                           <button
                             key={option}
-                            onClick={() => checkIn({ sound: option })}
-                            disabled={saving}
-                            style={{ backgroundColor: selected ? '#111827' : '#fff', color: selected ? '#fff' : '#374151' }}
-                            className="px-4 py-2 rounded-lg text-xs font-medium border border-gray-200 transition-colors"
+                            disabled
+                            className="px-4 py-2 rounded-lg text-xs font-medium border border-gray-200 bg-white text-gray-400"
                           >
                             {option === 'On' ? '🔊 On' : '🔇 Off'}
                           </button>
-                        );
-                      })}
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -307,6 +292,7 @@ export default function VenueDrawer({ onCreateParty }: Props) {
           )}
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

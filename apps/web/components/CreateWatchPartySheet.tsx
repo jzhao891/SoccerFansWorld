@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { collection, doc, setDoc } from 'firebase/firestore';
 import { geohashForLocation } from 'geofire-common';
 import { db } from '@/lib/firebase';
@@ -13,6 +13,7 @@ interface Props {
   defaultLocation?: { lat: number; lng: number };
   defaultSource?: 'google' | 'osm' | 'custom';
   defaultVenueId?: string | null;
+  defaultAddress?: string; // already-known address (google / existing fan zone); osm & custom geocode instead
 }
 
 // "TBD" first so it leads the list and is the default for knockout/unknown matches.
@@ -24,7 +25,7 @@ function defaultKickoffValue() {
   return d.toISOString().slice(0, 16);
 }
 
-export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation, defaultSource, defaultVenueId }: Props) {
+export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation, defaultSource, defaultVenueId, defaultAddress }: Props) {
   const viewState = useMapStore((s) => s.viewState);
 
   const [venueName, setVenueName] = useState('');
@@ -39,9 +40,45 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
   const [url, setUrl] = useState('');
   const [gpsLocation, setGpsLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
+  const [address, setAddress] = useState<string | null>(null);
+  const [addressLoading, setAddressLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const meetingPoint = gpsLocation ?? defaultLocation ?? { lat: viewState.latitude, lng: viewState.longitude };
+
+  // Resolve a human-readable address for the meeting point. Google places and
+  // existing fan zones already have one (defaultAddress); osm/custom + any GPS
+  // override get reverse-geocoded server-side.
+  useEffect(() => {
+    if (!isOpen) return;
+    const { lat, lng } = meetingPoint;
+
+    if (defaultAddress && !gpsLocation) {
+      setAddress(defaultAddress);
+      return;
+    }
+
+    let cancelled = false;
+    setAddressLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/geocode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lat, lng }),
+        });
+        const data = await res.json() as { address?: string };
+        if (!cancelled) setAddress(data.address ?? null);
+      } catch {
+        if (!cancelled) setAddress(null);
+      } finally {
+        if (!cancelled) setAddressLoading(false);
+      }
+    }, 300);
+
+    return () => { cancelled = true; clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, defaultAddress, gpsLocation, meetingPoint.lat, meetingPoint.lng]);
 
   function toggleTeam(team: string) {
     setSelectedTeams((prev) => {
@@ -75,6 +112,7 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
     setOrganizers('');
     setUrl('');
     setGpsLocation(null);
+    setAddress(null);
     onClose();
   }
 
@@ -91,6 +129,7 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
         event_title: eventTitle.trim(),
         ...(description.trim() ? { description: description.trim() } : {}),
         location: meetingPoint,
+        address: address ?? `${meetingPoint.lat.toFixed(5)}, ${meetingPoint.lng.toFixed(5)}`,
         geohash: geohashForLocation([meetingPoint.lat, meetingPoint.lng]),
         start_time: new Date(kickoffTime).getTime(),
         ...(endTime ? { end_time: new Date(endTime).getTime() } : {}),
@@ -100,7 +139,7 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
         amenities: [],
         ...(organizerList.length ? { organizers: organizerList } : {}),
         ...(url.trim() ? { url: url.trim() } : {}),
-        is_active: true, // temporary — see task #10 (default false once moderation lands)
+        is_active: false, // created inactive; a moderation sweep validates + activates it (see BACKLOGS.md)
         created_by: '',
         created_at: Date.now(),
       });
@@ -116,12 +155,17 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
   );
 
   return (
-    <div
-      className={`fixed top-4 left-4 z-30 w-[380px] max-w-[calc(100%-2rem)] max-h-[calc(100%-2rem)] overflow-y-auto bg-white rounded-2xl shadow-2xl transition-transform duration-300 ease-in-out ${
-        isOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1.5rem)]'
-      }`}
-    >
-      <div className="p-5">
+    <>
+      {/* Transparent click-catcher: a click anywhere dismisses the panel (map stays visible).
+          The next click then reaches the map/marker and opens the relevant panel. */}
+      {isOpen && <div className="fixed inset-0 z-20" onClick={resetAndClose} />}
+
+      <div
+        className={`fixed top-4 left-4 z-30 w-[380px] max-w-[calc(100%-2rem)] max-h-[calc(100%-2rem)] overflow-y-auto bg-white rounded-2xl shadow-2xl transition-transform duration-300 ease-in-out ${
+          isOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1.5rem)]'
+        }`}
+      >
+        <div className="p-5">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-bold text-gray-900">Create a fan zone</h2>
           <button onClick={resetAndClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none cursor-pointer">×</button>
@@ -202,9 +246,11 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
           </label>
           <div className="flex items-center gap-2">
             <div className="flex-1 px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-500 truncate">
-              {gpsLocation
-                ? `📍 ${gpsLocation.lat.toFixed(4)}, ${gpsLocation.lng.toFixed(4)}`
-                : `Map center (${viewState.latitude.toFixed(4)}, ${viewState.longitude.toFixed(4)})`}
+              {addressLoading
+                ? 'Finding address…'
+                : address
+                  ? `📍 ${address}`
+                  : `${meetingPoint.lat.toFixed(4)}, ${meetingPoint.lng.toFixed(4)}`}
             </div>
             <button
               onClick={useGPS}
@@ -327,7 +373,8 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
         >
           {saving ? 'Creating…' : 'Create fan zone'}
         </button>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
