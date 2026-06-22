@@ -101,7 +101,7 @@ export default function VenueDrawer({ onCreateParty }: Props) {
           {onCreateParty && (
             <button
               onClick={() => { onCreateParty(osmVenue.location, 'osm', osmVenue.id); dismiss(); }}
-              className="px-4 py-2 rounded-lg bg-gray-900/80 text-xs font-semibold text-white hover:bg-gray-900/90"
+              className="px-4 py-2 rounded-lg bg-gray-900/80 text-xs font-semibold text-white hover:bg-gray-900/90 cursor-pointer"
             >
               Create fan zone here
             </button>
@@ -146,7 +146,7 @@ export default function VenueDrawer({ onCreateParty }: Props) {
                 onCreateParty(place.location, src, vid);
                 setSelectedPlaceId(null);
               }}
-              className="px-4 py-2 rounded-lg bg-gray-900/80 text-xs font-semibold text-white hover:bg-gray-900/90 mb-4"
+              className="px-4 py-2 rounded-lg bg-gray-900/80 text-xs font-semibold text-white hover:bg-gray-900/90 cursor-pointer mb-4"
             >
               Create fan zone here
             </button>

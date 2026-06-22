@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { geohashForLocation } from 'geofire-common';
+import { WORLD_CUP_2026_TEAMS as KNOWN_TEAM_NAMES } from '../constants';
 
 dotenv.config({ path: path.resolve(process.cwd(), 'apps/web/.env.local') });
 
@@ -50,19 +51,7 @@ export type SeedVenue = {
 
 // ---- Known teams ----
 
-const WORLD_CUP_2026_TEAMS = new Set([
-  'Algeria', 'Argentina', 'Australia', 'Austria', 'Belgium', 'Bolivia',
-  'Bosnia and Herzegovina', 'Brazil', 'Cameroon', 'Canada', 'Cape Verde',
-  'Chile', 'Colombia', 'Costa Rica', 'Croatia', 'Czechia', 'DR Congo',
-  'Denmark', 'Ecuador', 'Egypt', 'England', 'France', 'Germany', 'Ghana',
-  'Haiti', 'Honduras', 'Hungary', 'Indonesia', 'Iran', 'Iraq', 'Israel',
-  'Japan', 'Jordan', 'Kenya', 'Mexico', 'Morocco', 'Netherlands',
-  'New Zealand', 'Nigeria', 'Norway', 'Panama', 'Paraguay', 'Peru',
-  'Portugal', 'Qatar', 'Saudi Arabia', 'Scotland', 'Senegal',
-  'South Africa', 'South Korea', 'Spain', 'Sweden', 'Switzerland',
-  'Türkiye', 'Tunisia', 'Ukraine', 'Uruguay', 'USA', 'Uzbekistan',
-  'Venezuela', 'Curaçao', 'Cote d\'Ivoire',
-]);
+const WORLD_CUP_2026_TEAMS = new Set(KNOWN_TEAM_NAMES);
 
 export function validateVenues(venues: SeedVenue[]): { valid: SeedVenue[]; invalid: SeedVenue[] } {
   const valid: SeedVenue[] = [];

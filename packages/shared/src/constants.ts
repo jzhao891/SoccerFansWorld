@@ -5,7 +5,9 @@ export interface AllowedRegion {
   bounds: BoundingBox;
 }
 
-// FIFA World Cup 2026 — 48 qualified teams
+// FIFA World Cup 2026 — 48 qualified teams. Single source of truth for both
+// venue seed validation and the create-fan-zone team picker, so DB data stays
+// consistent. Spellings match the names written to Firestore by the seed script.
 export const WORLD_CUP_2026_TEAMS: string[] = [
   // Co-hosts (3)
   'Canada', 'Mexico', 'USA',
@@ -16,11 +18,11 @@ export const WORLD_CUP_2026_TEAMS: string[] = [
   'England', 'France', 'Germany', 'Netherlands', 'Norway',
   'Portugal', 'Scotland', 'Spain', 'Sweden', 'Switzerland', 'Türkiye',
   // CAF (10)
-  'Algeria', 'Cabo Verde', 'Congo DR', 'Côte d\'Ivoire', 'Egypt',
+  'Algeria', 'Cape Verde', 'DR Congo', 'Cote d\'Ivoire', 'Egypt',
   'Ghana', 'Morocco', 'Senegal', 'South Africa', 'Tunisia',
   // AFC (9)
-  'Australia', 'IR Iran', 'Iraq', 'Japan', 'Jordan',
-  'Korea Republic', 'Qatar', 'Saudi Arabia', 'Uzbekistan',
+  'Australia', 'Iran', 'Iraq', 'Japan', 'Jordan',
+  'South Korea', 'Qatar', 'Saudi Arabia', 'Uzbekistan',
   // Concacaf non-host (3)
   'Curaçao', 'Haiti', 'Panama',
   // OFC (1)
