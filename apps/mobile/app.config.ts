@@ -41,7 +41,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-location',
       {
-        locationWhenInUsePermission: 'Allow Fandar AI to use your location to find fan venues near you.',
+        locationWhenInUsePermission: 'Allow FandarAI to use your location to find fan venues near you.',
       },
     ],
   ],
