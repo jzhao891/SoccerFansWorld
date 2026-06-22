@@ -43,15 +43,21 @@ export type FanZone = {
   // 'google': user tapped a Google venue dot; 'osm': user tapped a Mapbox POI label;
   // 'custom': user tapped empty map with no source venue.
   source: 'google' | 'osm' | 'custom';
-  venue_id: string | null; // Google place_id, OSM feature id, or null for custom
+  venue_id: string | null;  // Google place_id, OSM feature id, or null for custom
   name: string;
+  address: string;          // reverse geocoded from location on pin drop
   location: LatLng;
   geohash: string;
   event_title: string;
-  kickoff_time: number;     // Unix timestamp ms
-  watching_teams: string[]; // e.g. ["USA", "England"]
+  start_time?: number;      // Unix timestamp ms — event start at venue; omitted for TBD-time events
+  end_time?: number;        // Unix timestamp ms — event end at venue
+  // Present (real teams or ["TBD"]) => watch party. Absent => general fan event (Fan Zone only).
+  watching_teams?: string[]; // e.g. ["USA", "England"] or ["TBD"] for knockout rounds
+  admission?: 'free' | 'paid';
   amenities: string[];      // e.g. ["big screen", "outdoor seating"]
-  description?: string;     // free-text host note, custom parties only
+  description?: string;
+  organizers?: string[];
+  url?: string;
   is_active: boolean;
   created_by: string;
   created_at: number;       // Unix timestamp ms
@@ -77,6 +83,8 @@ export type MergedPlace = {
   location: LatLng;
   source: 'google' | 'fanzone';
   googleData?: GoogleVenue;
-  fanZone?: FanZone;
+  // All active events at this physical venue, sorted by start_time asc then event_title asc.
+  // Events sharing a venue_id are grouped here; custom parties (null venue_id) stand alone.
+  fanZones?: FanZone[];
   liveStatus?: LiveStatus;
 };

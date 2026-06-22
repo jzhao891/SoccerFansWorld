@@ -22,6 +22,8 @@
 
 ## 🟠 High Importance / Low Urgency
 
+- **LLM-powered venue creation from URL or text prompt:** Allow admins or users to paste an event URL or raw text description. An LLM parses the input and extracts structured FanZone fields (name, address, event_title, start_time, end_time, watching_teams, amenities, organizer, url, description). For seeding: bulk-generate many docs from a single schedule page (e.g. a venue hosting 30+ World Cup watch parties). For users: pre-fill the creation form for review and confirmation before submitting to Firestore.
+
 - **Submit mobile app to App Store:** Run `npx eas build --profile production --platform ios` to produce a signed `.ipa`, then `npx eas submit --platform ios` to push to TestFlight for internal testing before App Store review. Requires Apple Developer account and production Firebase config.
 
 - **Mobile Places API key security (pre-production):** `EXPO_PUBLIC_GOOGLE_PLACES_API_KEY` is currently restricted to Places API only. Two remaining steps before production: (1) **Set quota caps** — upgrade Google Cloud account to paid and set a daily request cap; (2) **Switch to native Google Places SDK** — replace the current JS `fetch()` calls with `GooglePlacesSwift` (iOS) / Android Places library so that Google Cloud Application Restrictions (bundle ID / SHA-1) can be enforced. Alternative: proxy all Places calls through the deployed Next.js `/api/places` route and restrict that key by HTTP referrer instead.

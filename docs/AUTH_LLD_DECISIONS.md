@@ -9,6 +9,7 @@
 | Google | ✅ | ✅ | ✅ |
 | Apple | ✅ | ✅ | ❌ |
 | Email / Password | ✅ | ✅ | ✅ |
+| Instagram | ❌ (extension layer — not a login method) | ❌ | ❌ |
 
 ### Shared Data Model (`packages/shared`)
 

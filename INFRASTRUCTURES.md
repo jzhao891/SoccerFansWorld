@@ -15,6 +15,7 @@
 
 ### Firestore Indexes
 - `venues`: composite index on `is_active` (asc) + `geohash` (asc)
+- `venues`: composite index on `venue_id` (asc) + `start_time` (asc) — required by seed script dedup query
 
 ### Env vars (`apps/web/.env.local`)
 ```

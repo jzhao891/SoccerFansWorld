@@ -21,10 +21,11 @@ const place: GoogleVenue = {
 
 const fanZoneBase: Omit<FanZone, 'id' | 'source' | 'venue_id'> = {
   name: 'The Fan Zone',
+  address: '1 Test St, Seattle, WA',
   location: { lat: 47.6, lng: -122.3 },
   geohash: 'c23nb',
   event_title: 'World Cup 2026',
-  kickoff_time: 0,
+  start_time: 0,
   watching_teams: ['England'],
   amenities: [],
   is_active: true,
@@ -48,7 +49,8 @@ describe('useMergedPlaces', () => {
     // Google dot suppressed; only the FanZone dot shown
     expect(result.current).toHaveLength(1);
     expect(result.current[0].source).toBe('fanzone');
-    expect(result.current[0].fanZone?.id).toBe('fz_001');
+    expect(result.current[0].id).toBe('venue:gp_001');
+    expect(result.current[0].fanZones?.[0].id).toBe('fz_001');
   });
 
   it('returns fanzone source for a custom fan zone with no linked venue', () => {
@@ -67,7 +69,7 @@ describe('useMergedPlaces', () => {
     const { result } = renderHook(() => useMergedPlaces());
     // FanZone always shown; gp_001 is not covered (only gp_not_returned is), so both appear
     expect(result.current).toHaveLength(2);
-    expect(result.current.find((p) => p.id === 'fz_skip')).toBeDefined();
+    expect(result.current.find((p) => p.id === 'venue:gp_not_returned')).toBeDefined();
     expect(result.current.find((p) => p.id === 'gp_001')).toBeDefined();
   });
 
@@ -84,5 +86,34 @@ describe('useMergedPlaces', () => {
     expect(result.current).toHaveLength(2);
     const sources = result.current.map((p) => p.source).sort();
     expect(sources).toEqual(['fanzone', 'google']);
+  });
+
+  it('groups events sharing a venue_id into one place, sorted by date then name', () => {
+    const events: FanZone[] = [
+      { ...fanZoneBase, id: 'e_late', source: 'google', venue_id: 'gp_001', event_title: 'B match', start_time: 3000 },
+      { ...fanZoneBase, id: 'e_early', source: 'google', venue_id: 'gp_001', event_title: 'A match', start_time: 1000 },
+      { ...fanZoneBase, id: 'e_tie_b', source: 'google', venue_id: 'gp_001', event_title: 'Zebra', start_time: 2000 },
+      { ...fanZoneBase, id: 'e_tie_a', source: 'google', venue_id: 'gp_001', event_title: 'Apple', start_time: 2000 },
+    ];
+    useMapStore.setState({ places: [place], fanZones: events });
+    const { result } = renderHook(() => useMergedPlaces());
+    // All four collapse into one pin
+    expect(result.current).toHaveLength(1);
+    expect(result.current[0].id).toBe('venue:gp_001');
+    // Sorted by start_time asc, then event_title asc for the tie at 2000
+    expect(result.current[0].fanZones?.map((fz) => fz.id)).toEqual([
+      'e_early', 'e_tie_a', 'e_tie_b', 'e_late',
+    ]);
+  });
+
+  it('excludes inactive events', () => {
+    const events: FanZone[] = [
+      { ...fanZoneBase, id: 'e_active', source: 'custom', venue_id: null, is_active: true },
+      { ...fanZoneBase, id: 'e_inactive', source: 'custom', venue_id: null, is_active: false },
+    ];
+    useMapStore.setState({ places: [], fanZones: events });
+    const { result } = renderHook(() => useMergedPlaces());
+    expect(result.current).toHaveLength(1);
+    expect(result.current[0].id).toBe('e_active');
   });
 });
