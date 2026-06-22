@@ -10,12 +10,30 @@ import {
   StyleSheet,
   Dimensions,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useMapStore, useMergedPlaces } from '@sfw/shared';
-import type { LiveStatus } from '@sfw/shared';
+import type { FanZone, LiveStatus } from '@sfw/shared';
 import { colors, spacing, radius, shadow } from '../theme';
+
+// A FanZone is a watch party iff it carries watching_teams (real teams or ["TBD"]).
+// Without that field it's a general fan event — Fan Zone only.
+function isWatchParty(fz: FanZone): boolean {
+  return Array.isArray(fz.watching_teams) && fz.watching_teams.length > 0;
+}
+
+function isTeamsTBD(fz: FanZone): boolean {
+  return isWatchParty(fz) && fz.watching_teams!.every((t) => t === 'TBD');
+}
+
+function formatStart(ms?: number): string {
+  if (!ms) return 'Time TBD';
+  return new Date(ms).toLocaleString(undefined, {
+    weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+  });
+}
 
 const DRAWER_HEIGHT = Dimensions.get('window').height * 0.75;
 
@@ -43,7 +61,10 @@ export default function VenueDrawer({ onCreateParty }: Props) {
 
   const osmVenue = selectedOsmVenue;
   const place = osmVenue ? null : (mergedPlaces.find((p) => p.id === selectedPlaceId) ?? null);
-  const venueId = place?.fanZone?.id ?? null;
+  const events = place?.fanZones ?? [];
+  const rep = events[0] ?? null;
+  // Live status is keyed per physical venue: venue_id when present, else the lone event's id.
+  const venueId = rep ? (rep.venue_id ?? rep.id) : null;
   const liveStatus = venueId ? liveStatuses[venueId] ?? null : null;
 
   const isOpen = osmVenue !== null || place !== null;
@@ -114,8 +135,8 @@ export default function VenueDrawer({ onCreateParty }: Props) {
             <Pressable
               style={({ pressed }) => [styles.hostBtn, pressed && styles.hostBtnPressed]}
               onPress={() => {
-                const src = place.source === 'google' ? 'google' : (place.fanZone?.source ?? 'custom');
-                const vid = place.source === 'google' ? place.id : (place.fanZone?.venue_id ?? null);
+                const src = place.source === 'google' ? 'google' : (rep?.source ?? 'custom');
+                const vid = place.source === 'google' ? place.id : (rep?.venue_id ?? null);
                 onCreateParty(place.location, src, vid);
               }}
             >
@@ -134,8 +155,8 @@ export default function VenueDrawer({ onCreateParty }: Props) {
               <View style={styles.headerRow}>
                 <View style={styles.headerText}>
                   <Text style={styles.placeName}>{place.name}</Text>
-                  {place.googleData?.vicinity && (
-                    <Text style={styles.vicinity}>{place.googleData.vicinity}</Text>
+                  {(rep?.address || place.googleData?.vicinity) && (
+                    <Text style={styles.vicinity}>{rep?.address ?? place.googleData?.vicinity}</Text>
                   )}
                 </View>
                 <TouchableOpacity onPress={dismiss} hitSlop={12}>
@@ -144,62 +165,91 @@ export default function VenueDrawer({ onCreateParty }: Props) {
               </View>
 
               {/* Meta row */}
-              <View style={styles.metaRow}>
-                {place.googleData?.rating != null && (
-                  <Text style={styles.metaText}>⭐ {place.googleData.rating}</Text>
-                )}
-                {place.googleData?.open_now != null && (
-                  <Text style={[styles.metaText, place.googleData.open_now ? styles.openText : styles.closedText]}>
-                    {place.googleData.open_now ? 'Open now' : 'Closed'}
-                  </Text>
-                )}
-                <View style={[
-                  styles.sourceBadge,
-                  place.source === 'fanzone' ? styles.sourceMerged : styles.sourceGoogle,
-                ]}>
-                  <Text style={[
-                    styles.sourceBadgeText,
-                    place.source === 'fanzone' ? styles.sourceMergedText : styles.sourceGoogleText,
-                  ]}>{place.source === 'fanzone' ? (place.fanZone?.source ?? 'fanzone') : 'google'}</Text>
-                </View>
-              </View>
-
-              {/* Fan zone */}
-              {place.fanZone && (
-                <>
-                  <View style={styles.divider} />
-                  <Text style={styles.sectionTitle}>📺 {place.fanZone.event_title}</Text>
-                  {place.fanZone.kickoff_time > 0 && (
-                    <Text style={styles.subText}>
-                      🕐 {new Date(place.fanZone.kickoff_time).toLocaleString(undefined, {
-                        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-                      })}
+              {place.googleData && (place.googleData.rating != null || place.googleData.open_now != null) && (
+                <View style={styles.metaRow}>
+                  {place.googleData.rating != null && (
+                    <Text style={styles.metaText}>⭐ {place.googleData.rating}</Text>
+                  )}
+                  {place.googleData.open_now != null && (
+                    <Text style={[styles.metaText, place.googleData.open_now ? styles.openText : styles.closedText]}>
+                      {place.googleData.open_now ? 'Open now' : 'Closed'}
                     </Text>
                   )}
-                  {place.fanZone.description && (
-                    <Text style={[styles.subText, styles.italic]}>{place.fanZone.description}</Text>
-                  )}
-                  {place.fanZone.watching_teams.length > 0 && (
+                </View>
+              )}
+
+              {/* Events list — sorted by date then name in useMergedPlaces */}
+              {events.map((fz) => {
+                const watchParty = isWatchParty(fz);
+                return (
+                  <View key={fz.id} style={styles.eventBlock}>
+                    {/* Tags */}
                     <View style={styles.tagRow}>
-                      {place.fanZone.watching_teams.map((team) => (
-                        <View key={team} style={styles.tag}>
-                          <Text style={styles.tagText}>{team}</Text>
+                      <View style={[styles.pill, styles.fanZonePill]}>
+                        <Text style={[styles.pillText, styles.fanZonePillText]}>Fan Zone</Text>
+                      </View>
+                      {watchParty && (
+                        <View style={[styles.pill, styles.watchPartyPill]}>
+                          <Text style={[styles.pillText, styles.watchPartyPillText]}>Watch Party</Text>
                         </View>
-                      ))}
+                      )}
+                      {fz.admission && (
+                        <View style={[styles.pill, fz.admission === 'free' ? styles.freePill : styles.paidPill]}>
+                          <Text style={[styles.pillText, fz.admission === 'free' ? styles.freePillText : styles.paidPillText]}>
+                            {fz.admission === 'free' ? 'Free' : 'Paid'}
+                          </Text>
+                        </View>
+                      )}
                     </View>
-                  )}
-                  {place.fanZone.amenities.length > 0 && (
-                    <View style={{ marginTop: 10 }}>
-                      <Text style={styles.labelText}>Amenities</Text>
+
+                    <Text style={styles.eventTitle}>{fz.event_title}</Text>
+                    <Text style={styles.subText}>🕐 {formatStart(fz.start_time)}</Text>
+
+                    {fz.description && (
+                      <Text style={[styles.subText, styles.italic]}>{fz.description}</Text>
+                    )}
+
+                    {/* Teams */}
+                    {watchParty && (
                       <View style={styles.tagRow}>
-                        {place.fanZone.amenities.map((a) => (
-                          <View key={a} style={styles.tag}>
-                            <Text style={styles.tagText}>{a.replace(/_/g, ' ')}</Text>
+                        {isTeamsTBD(fz) ? (
+                          <View style={styles.tag}><Text style={styles.tagText}>Match TBD</Text></View>
+                        ) : (
+                          fz.watching_teams!.map((team) => (
+                            <View key={team} style={styles.tag}>
+                              <Text style={styles.tagText}>{team}</Text>
+                            </View>
+                          ))
+                        )}
+                      </View>
+                    )}
+
+                    {/* Amenities */}
+                    {fz.amenities.length > 0 && (
+                      <View style={styles.tagRow}>
+                        {fz.amenities.map((a) => (
+                          <View key={a} style={styles.tagFaint}>
+                            <Text style={styles.tagFaintText}>{a.replace(/_/g, ' ')}</Text>
                           </View>
                         ))}
                       </View>
-                    </View>
-                  )}
+                    )}
+
+                    {/* URL */}
+                    {fz.url && (
+                      <TouchableOpacity onPress={() => Linking.openURL(fz.url!)} hitSlop={8}>
+                        <Text style={styles.urlLink}>🔗 Event page</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              })}
+
+              {/* Empty state */}
+              {place.source === 'fanzone' && events.length === 0 && (
+                <>
+                  <View style={styles.divider} />
+                  <Text style={styles.emptyText}>No upcoming events.</Text>
                 </>
               )}
 
@@ -325,6 +375,22 @@ const styles = StyleSheet.create({
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
   tag: { paddingHorizontal: 10, paddingVertical: spacing.xs, backgroundColor: colors.borderLight, borderRadius: radius.full },
   tagText: { fontSize: 12, color: '#4B5563' },
+  tagFaint: { paddingHorizontal: 10, paddingVertical: spacing.xs, backgroundColor: '#F9FAFB', borderRadius: radius.full },
+  tagFaintText: { fontSize: 12, color: colors.textMuted, textTransform: 'capitalize' },
+  eventBlock: { borderTopWidth: 1, borderTopColor: colors.borderLight, paddingVertical: 12 },
+  eventTitle: { fontSize: 14, fontWeight: '700', color: colors.black, marginTop: 6 },
+  pill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.full },
+  pillText: { fontSize: 11, fontWeight: '600' },
+  fanZonePill: { backgroundColor: '#FFEDD5' },
+  fanZonePillText: { color: '#C2410C' },
+  watchPartyPill: { backgroundColor: '#F3E8FF' },
+  watchPartyPillText: { color: '#7E22CE' },
+  freePill: { backgroundColor: '#DCFCE7' },
+  freePillText: { color: '#15803D' },
+  paidPill: { backgroundColor: colors.borderLight },
+  paidPillText: { color: colors.textMuted },
+  urlLink: { fontSize: 12, fontWeight: '600', color: '#2563EB', marginTop: 8 },
+  emptyText: { fontSize: 13, color: colors.textMuted, textAlign: 'center' },
   labelText: { fontSize: 12, color: colors.textFaint, marginBottom: spacing.xs },
   liveRow: { flexDirection: 'row', gap: spacing.xxl },
   liveValue: { fontSize: 14, fontWeight: '500', color: colors.black, marginTop: 2 },

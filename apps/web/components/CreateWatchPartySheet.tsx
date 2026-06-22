@@ -76,7 +76,7 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
         ...(description.trim() ? { description: description.trim() } : {}),
         location: meetingPoint,
         geohash: geohashForLocation([meetingPoint.lat, meetingPoint.lng]),
-        kickoff_time: new Date(kickoffTime).getTime(),
+        start_time: new Date(kickoffTime).getTime(),
         watching_teams: selectedTeams,
         amenities: [],
         is_active: true,
