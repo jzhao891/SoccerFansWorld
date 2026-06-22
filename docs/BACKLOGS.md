@@ -14,10 +14,6 @@
 
 - **Apple Sign in with Apple — complete Service ID configuration:** Blocked until the iOS App ID (bundle ID) is registered. See `INFRASTRUCTURES.md` → Firebase Auth → Step 4 for the exact steps to complete.
 
-- **Support page (`fandar.ai/support`):** Create `apps/web/app/support/page.tsx` with contact email (`footballfansworld.labs@gmail.com`), data deletion request instructions, and basic FAQ. Required by both App Store and Play Store — referenced in the privacy policy.
-
-- **Multiple watch parties at the same location:** Multiple FanZone docs can share the same `venue_id`, but `useMergedPlaces` currently surfaces one pin per location. Need to decide: (1) pin rendering — cluster badge with count, or offset overlapping pins radially; (2) drawer UX — tapping a cluster shows a list of all parties at that location before drilling into one.
-
 - **Fan zone moderation sweep:** User-created fan zones are written `is_active: false` (pending moderation), so they do not appear on the map until approved. Write a sweep that scans inactive `venues` docs, validates each against the FanZone contract (required fields present; valid `source`/`admission`/`location`; `start_time` present; `watching_teams` entries are known teams or `TBD`), and flips `is_active: true` for passing docs — failing docs stay inactive and are logged for manual review. Run on demand for now; designed to be lifted into a scheduled job (Cloud Function / cron). Until this runs, newly created fan zones stay hidden.
 
 ---
