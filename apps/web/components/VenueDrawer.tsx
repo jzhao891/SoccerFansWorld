@@ -30,16 +30,6 @@ function formatStart(ms?: number): string {
   });
 }
 
-// Check-in is only meaningful for an event happening today.
-function isToday(ms?: number): boolean {
-  if (!ms) return false;
-  const d = new Date(ms);
-  const now = new Date();
-  return d.getFullYear() === now.getFullYear()
-    && d.getMonth() === now.getMonth()
-    && d.getDate() === now.getDate();
-}
-
 interface Props {
   onCreateParty?: (location: { lat: number; lng: number }, source: 'google' | 'osm' | 'custom', venue_id: string | null, address?: string) => void;
 }
@@ -147,7 +137,6 @@ export default function VenueDrawer({ onCreateParty }: Props) {
           {/* Events list — sorted by date then name in useMergedPlaces */}
           {events.map((fz) => {
             const watchParty = isWatchParty(fz);
-            const today = isToday(fz.start_time);
             return (
               <div key={fz.id} className="rounded-xl border border-gray-200 p-3.5 mb-3">
                 {/* Title */}
@@ -217,9 +206,8 @@ export default function VenueDrawer({ onCreateParty }: Props) {
                   </a>
                 )}
 
-                {/* Check-in — only for events happening today.
-                    Disabled until auth lands (check-in/RSVP require a signed-in user). */}
-                {today && venueId && (
+                {/* Check-in — per event, disabled until auth lands (check-in/RSVP require a signed-in user). */}
+                {venueId && (
                   <div className="mt-3 pt-3 border-t border-gray-100">
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
                       Check in <span className="font-normal normal-case">(sign in required)</span>

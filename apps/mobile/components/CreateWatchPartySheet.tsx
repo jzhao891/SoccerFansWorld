@@ -262,7 +262,7 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
           <Text style={styles.label}>Venue name <Text style={styles.required}>*</Text></Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g. WC Watch Party"
+            placeholder="e.g. World Cup 2026 Celebration Festival"
             placeholderTextColor={colors.textFaint}
             value={venueName}
             onChangeText={setVenueName}

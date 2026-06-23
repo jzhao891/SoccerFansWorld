@@ -20,6 +20,8 @@ function MapScreen() {
   const setBounds = useMapStore((s) => s.setBounds);
   const selectedPlaceId = useMapStore((s) => s.selectedPlaceId);
   const setSelectedPlaceId = useMapStore((s) => s.setSelectedPlaceId);
+  const selectedOsmVenue = useMapStore((s) => s.selectedOsmVenue);
+  const setSelectedOsmVenue = useMapStore((s) => s.setSelectedOsmVenue);
   const [mapPressPoint, setMapPressPoint] = useState<{ lat: number; lng: number } | null>(null);
   const [mapPressScreen, setMapPressScreen] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [createPartyOpen, setCreatePartyOpen] = useState(false);
@@ -49,7 +51,14 @@ function MapScreen() {
       suppressNextMapPress.current = false;
       return;
     }
-    setSelectedPlaceId(null);
+    // If a venue/osm drawer is open, the first tap just dismisses it (no marker).
+    // A second tap then drops the pin and shows the create action.
+    if (selectedPlaceId !== null || selectedOsmVenue !== null) {
+      setSelectedPlaceId(null);
+      setSelectedOsmVenue(null);
+      setMapPressPoint(null);
+      return;
+    }
     setMapPressScreen(screen);
     setMapPressPoint((prev) => (prev ? null : lngLat));
   }
