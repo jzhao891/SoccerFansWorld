@@ -2,10 +2,6 @@
 
 ## 🔴 High Importance / High Urgency
 
-- **Deploy web app to Vercel:** Connect the GitHub repo to Vercel, configure all environment variables (Firebase, Google Places, Mapbox), and enable auto-deploy on push to `main`. Set the custom domain once purchased.
-
-- **Domain setup:** Purchase domain, then wire DNS to Vercel's DNS target (A/CNAME). If using Cloudflare + Route 53, update Cloudflare's nameservers to point at the Route 53 NS records, then add the Vercel CNAME in Route 53.
-
 - **Authentication flow:** Add Firebase Auth (Google/Apple sign-in) so actions like creating a watch party, checking in, and RSVPing are tied to a real user identity. Required before shipping RSVP or host controls. `created_by` field in FanZone already expects a user ID — currently unpopulated.
 
 - **Firestore security rules:** Currently all Firestore reads and writes are open. Add proper security rules: `live_statuses` and `venues` should require Auth for writes; read access can remain open. Watch party creation (`venues` collection) should only allow writes from authenticated users and enforce that `created_by` matches the requesting user's UID. Consider rate-limiting rules to prevent abuse.
