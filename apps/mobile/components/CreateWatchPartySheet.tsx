@@ -27,16 +27,6 @@ function defaultKickoff() {
   return d;
 }
 
-function formatDateTime(d: Date) {
-  return d.toLocaleString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 interface Props {
   visible: boolean;
   onClose: () => void;
@@ -53,13 +43,19 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
     ? { lat: (bounds.north + bounds.south) / 2, lng: (bounds.east + bounds.west) / 2 }
     : { lat: viewState.latitude, lng: viewState.longitude });
 
-  const [partyName, setPartyName] = useState('');
+  const [venueName, setVenueName] = useState('');
   const [eventTitle, setEventTitle] = useState('');
   const [description, setDescription] = useState('');
   const [kickoff, setKickoff] = useState<Date>(defaultKickoff);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [endTime, setEndTime] = useState<Date | null>(null);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+  const [admission, setAdmission] = useState<'free' | 'paid'>('free');
+  const [organizers, setOrganizers] = useState('');
+  const [url, setUrl] = useState('');
   const [gpsLocation, setGpsLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -76,11 +72,13 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
     if (!visible) {
       setShowDatePicker(false);
       setShowTimePicker(false);
+      setShowEndDatePicker(false);
+      setShowEndTimePicker(false);
     }
   }, [visible, translateY]);
 
   const meetingPoint = gpsLocation ?? mapCenter;
-  const canSubmit = partyName.trim() && eventTitle.trim();
+  const canSubmit = Boolean(venueName.trim() && eventTitle.trim());
 
   function toggleTeam(team: string) {
     setSelectedTeams((prev) =>
@@ -118,12 +116,34 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
     }
   }
 
+  function handleEndDateChange(_: DateTimePickerEvent, selected?: Date) {
+    if (Platform.OS === 'android') setShowEndDatePicker(false);
+    if (selected) {
+      const next = new Date(endTime ?? kickoff);
+      next.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
+      setEndTime(next);
+    }
+  }
+
+  function handleEndTimeChange(_: DateTimePickerEvent, selected?: Date) {
+    if (Platform.OS === 'android') setShowEndTimePicker(false);
+    if (selected) {
+      const next = new Date(endTime ?? kickoff);
+      next.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
+      setEndTime(next);
+    }
+  }
+
   function resetAndClose() {
-    setPartyName('');
+    setVenueName('');
     setEventTitle('');
     setDescription('');
     setKickoff(defaultKickoff());
+    setEndTime(null);
     setSelectedTeams([]);
+    setAdmission('free');
+    setOrganizers('');
+    setUrl('');
     setGpsLocation(null);
     onClose();
   }
@@ -132,19 +152,24 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
     if (!canSubmit || saving) return;
     setSaving(true);
     try {
+      const organizerList = organizers.split(',').map((o) => o.trim()).filter(Boolean);
       const ref = doc(collection(db, 'venues'));
       await setDoc(ref, {
         source: defaultSource ?? 'custom',
         venue_id: defaultVenueId ?? null,
-        name: partyName.trim(),
+        name: venueName.trim(),
         event_title: eventTitle.trim(),
         ...(description.trim() ? { description: description.trim() } : {}),
         location: meetingPoint,
         geohash: geohashForLocation([meetingPoint.lat, meetingPoint.lng]),
         start_time: kickoff.getTime(),
+        ...(endTime ? { end_time: endTime.getTime() } : {}),
         watching_teams: selectedTeams,
+        admission,
         amenities: [],
-        is_active: true,
+        ...(organizerList.length ? { organizers: organizerList } : {}),
+        ...(url.trim() ? { url: url.trim() } : {}),
+        is_active: false, // created inactive; a moderation sweep validates + activates it (see BACKLOGS.md)
         created_by: '',
         created_at: Date.now(),
       });
@@ -166,26 +191,26 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
         </TouchableOpacity>
 
         <View style={styles.header}>
-          <Text style={styles.title}>Host a watch party</Text>
+          <Text style={styles.title}>Create a fan zone</Text>
           <TouchableOpacity onPress={resetAndClose} hitSlop={8}>
             <Text style={styles.closeBtn}>✕</Text>
           </TouchableOpacity>
         </View>
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-          {/* Party name */}
-          <Text style={styles.label}>Party name <Text style={styles.required}>*</Text></Text>
+          {/* Venue name */}
+          <Text style={styles.label}>Venue name <Text style={styles.required}>*</Text></Text>
           <TextInput
             style={styles.input}
             placeholder="e.g. WC Watch Party"
             placeholderTextColor={colors.textFaint}
-            value={partyName}
-            onChangeText={setPartyName}
+            value={venueName}
+            onChangeText={setVenueName}
             returnKeyType="next"
           />
 
           {/* Event title */}
-          <Text style={styles.label}>What are you watching? <Text style={styles.required}>*</Text></Text>
+          <Text style={styles.label}>Event title <Text style={styles.required}>*</Text></Text>
           <TextInput
             style={styles.input}
             placeholder="e.g. USA vs England — Group Stage"
@@ -195,8 +220,21 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
             returnKeyType="next"
           />
 
-          {/* Date & time */}
-          <Text style={styles.label}>Date & time <Text style={styles.required}>*</Text></Text>
+          {/* Event description */}
+          <Text style={styles.label}>Event description <Text style={styles.optional}>(optional)</Text></Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            placeholder="e.g. Meet here first, then we'll head somewhere together"
+            placeholderTextColor={colors.textFaint}
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            numberOfLines={3}
+            textAlignVertical="top"
+          />
+
+          {/* Start */}
+          <Text style={styles.label}>Start <Text style={styles.required}>*</Text></Text>
           <View style={styles.dateRow}>
             <TouchableOpacity style={styles.dateBtn} onPress={() => { setShowDatePicker(true); setShowTimePicker(false); }}>
               <Text style={styles.dateBtnText}>
@@ -225,6 +263,51 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
               mode="time"
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
               onChange={handleTimeChange}
+            />
+          )}
+
+          {/* End (optional) */}
+          <Text style={styles.label}>End <Text style={styles.optional}>(optional)</Text></Text>
+          {endTime ? (
+            <View style={styles.dateRow}>
+              <TouchableOpacity style={styles.dateBtn} onPress={() => { setShowEndDatePicker(true); setShowEndTimePicker(false); }}>
+                <Text style={styles.dateBtnText}>
+                  {endTime.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.dateBtn} onPress={() => { setShowEndTimePicker(true); setShowEndDatePicker(false); }}>
+                <Text style={styles.dateBtnText}>
+                  {endTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.clearBtn} onPress={() => { setEndTime(null); setShowEndDatePicker(false); setShowEndTimePicker(false); }} hitSlop={8}>
+                <Text style={styles.clearBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={() => setEndTime(new Date(kickoff.getTime() + 2 * 60 * 60 * 1000))}
+            >
+              <Text style={styles.addBtnText}>Add end time</Text>
+            </TouchableOpacity>
+          )}
+
+          {showEndDatePicker && (
+            <DateTimePicker
+              value={endTime ?? kickoff}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'inline' : 'default'}
+              minimumDate={kickoff}
+              onChange={handleEndDateChange}
+            />
+          )}
+          {showEndTimePicker && (
+            <DateTimePicker
+              value={endTime ?? kickoff}
+              mode="time"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={handleEndTimeChange}
             />
           )}
 
@@ -264,17 +347,47 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
             })}
           </View>
 
-          {/* Description */}
-          <Text style={styles.label}>Description <Text style={styles.optional}>(optional)</Text></Text>
+          {/* Admission */}
+          <Text style={styles.label}>Admission <Text style={styles.required}>*</Text></Text>
+          <View style={styles.admissionRow}>
+            {(['free', 'paid'] as const).map((opt) => {
+              const active = admission === opt;
+              return (
+                <TouchableOpacity
+                  key={opt}
+                  style={[styles.admissionBtn, active && styles.admissionBtnActive]}
+                  onPress={() => setAdmission(opt)}
+                >
+                  <Text style={[styles.admissionBtnText, active && styles.admissionBtnTextActive]}>
+                    {opt === 'free' ? 'Free' : 'Paid'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Organizers */}
+          <Text style={styles.label}>Organizers <Text style={styles.optional}>(optional, comma-separated)</Text></Text>
           <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="e.g. Meet here first, then we'll head somewhere together"
+            style={styles.input}
+            placeholder="e.g. Local Supporters Club, Pub Co"
             placeholderTextColor={colors.textFaint}
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
+            value={organizers}
+            onChangeText={setOrganizers}
+            returnKeyType="next"
+          />
+
+          {/* URL */}
+          <Text style={styles.label}>Event page URL <Text style={styles.optional}>(optional)</Text></Text>
+          <TextInput
+            style={styles.input}
+            placeholder="https://…"
+            placeholderTextColor={colors.textFaint}
+            value={url}
+            onChangeText={setUrl}
+            autoCapitalize="none"
+            keyboardType="url"
+            returnKeyType="done"
           />
 
           {/* Submit */}
@@ -285,7 +398,7 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
           >
             {saving
               ? <ActivityIndicator size="small" color={colors.white} />
-              : <Text style={styles.submitText}>Create watch party</Text>}
+              : <Text style={styles.submitText}>Create fan zone</Text>}
           </TouchableOpacity>
 
           <View style={{ height: spacing.xl }} />
@@ -356,7 +469,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   textArea: { minHeight: 80, paddingTop: 10 },
-  dateRow: { flexDirection: 'row', gap: spacing.sm },
+  dateRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
   dateBtn: {
     flex: 1,
     backgroundColor: colors.bgSubtle,
@@ -367,6 +480,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dateBtnText: { fontSize: 14, color: colors.textPrimary, fontWeight: '500' },
+  clearBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clearBtnText: { fontSize: 14, color: colors.textFaint },
+  addBtn: {
+    backgroundColor: colors.bgSubtle,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  addBtnText: { fontSize: 14, color: colors.textSecondary, fontWeight: '500' },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -402,6 +535,19 @@ const styles = StyleSheet.create({
   teamPillActive: { backgroundColor: colors.black, borderColor: colors.black },
   teamPillText: { fontSize: 12, fontWeight: '500', color: colors.textSecondary },
   teamPillTextActive: { color: colors.white },
+  admissionRow: { flexDirection: 'row', gap: spacing.sm },
+  admissionBtn: {
+    flex: 1,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  admissionBtnActive: { backgroundColor: colors.black, borderColor: colors.black },
+  admissionBtnText: { fontSize: 14, color: colors.textSecondary, fontWeight: '500' },
+  admissionBtnTextActive: { color: colors.white },
   submitBtn: {
     marginTop: spacing.xl,
     backgroundColor: colors.black,
