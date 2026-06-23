@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,11 +9,8 @@ import {
   Animated,
   StyleSheet,
   Dimensions,
-  ActivityIndicator,
   Linking,
 } from 'react-native';
-import { doc, setDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
 import { useMapStore, useMergedPlaces } from '@sfw/shared';
 import type { FanZone, LiveStatus } from '@sfw/shared';
 import { colors, spacing, radius, shadow } from '../theme';
@@ -35,6 +32,16 @@ function formatStart(ms?: number): string {
   });
 }
 
+// Check-in is only meaningful for an event happening today.
+function isToday(ms?: number): boolean {
+  if (!ms) return false;
+  const d = new Date(ms);
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear()
+    && d.getMonth() === now.getMonth()
+    && d.getDate() === now.getDate();
+}
+
 const DRAWER_HEIGHT = Dimensions.get('window').height * 0.75;
 
 const CROWD_OPTIONS: LiveStatus['crowd_index'][] = ['Chill', 'Buzzing', 'Packed', 'Wild'];
@@ -47,7 +54,7 @@ const CROWD_EMOJI: Record<string, string> = {
 };
 
 interface Props {
-  onCreateParty: (location: { lat: number; lng: number }, source: 'google' | 'osm' | 'custom', venue_id: string | null) => void;
+  onCreateParty: (location: { lat: number; lng: number }, source: 'google' | 'osm' | 'custom', venue_id: string | null, address?: string) => void;
 }
 
 export default function VenueDrawer({ onCreateParty }: Props) {
@@ -57,7 +64,6 @@ export default function VenueDrawer({ onCreateParty }: Props) {
   const setSelectedOsmVenue = useMapStore((s) => s.setSelectedOsmVenue);
   const liveStatuses = useMapStore((s) => s.liveStatuses);
   const mergedPlaces = useMergedPlaces();
-  const [saving, setSaving] = useState(false);
 
   const osmVenue = selectedOsmVenue;
   const place = osmVenue ? null : (mergedPlaces.find((p) => p.id === selectedPlaceId) ?? null);
@@ -84,17 +90,6 @@ export default function VenueDrawer({ onCreateParty }: Props) {
       speed: 14,
     }).start();
   }, [isOpen, translateY]);
-
-  async function checkIn(patch: Partial<Pick<LiveStatus, 'crowd_index' | 'sound'>>) {
-    if (!venueId) return;
-    setSaving(true);
-    await setDoc(
-      doc(db, 'live_statuses', venueId),
-      { venue_id: venueId, ...liveStatus, ...patch, updated_at: Date.now() },
-      { merge: true },
-    );
-    setSaving(false);
-  }
 
   return (
     <>
@@ -124,7 +119,7 @@ export default function VenueDrawer({ onCreateParty }: Props) {
               style={({ pressed }) => [styles.hostBtn, pressed && styles.hostBtnPressed]}
               onPress={() => { onCreateParty(osmVenue.location, 'osm', osmVenue.id); dismiss(); }}
             >
-              <Text style={styles.hostBtnText}>🎉  Host watch party here</Text>
+              <Text style={styles.hostBtnText}>Create fan zone here</Text>
             </Pressable>
           </ScrollView>
         )}
@@ -137,10 +132,12 @@ export default function VenueDrawer({ onCreateParty }: Props) {
               onPress={() => {
                 const src = place.source === 'google' ? 'google' : (rep?.source ?? 'custom');
                 const vid = place.source === 'google' ? place.id : (rep?.venue_id ?? null);
-                onCreateParty(place.location, src, vid);
+                // Google place + existing fan zone already carry an address — reuse it (no geocode).
+                const addr = place.source === 'google' ? place.googleData?.vicinity : rep?.address;
+                onCreateParty(place.location, src, vid, addr);
               }}
             >
-              <Text style={styles.hostBtnText}>🎉  Host watch party here</Text>
+              <Text style={styles.hostBtnText}>Create fan zone here</Text>
             </Pressable>
             <ScrollView
               style={styles.scroll}
@@ -181,8 +178,15 @@ export default function VenueDrawer({ onCreateParty }: Props) {
               {/* Events list — sorted by date then name in useMergedPlaces */}
               {events.map((fz) => {
                 const watchParty = isWatchParty(fz);
+                const today = isToday(fz.start_time);
                 return (
                   <View key={fz.id} style={styles.eventBlock}>
+                    {/* Title */}
+                    <Text style={styles.eventTitle}>{fz.event_title}</Text>
+
+                    {/* Date & time */}
+                    <Text style={styles.subText}>{formatStart(fz.start_time)}</Text>
+
                     {/* Tags */}
                     <View style={styles.tagRow}>
                       <View style={[styles.pill, styles.fanZonePill]}>
@@ -201,9 +205,6 @@ export default function VenueDrawer({ onCreateParty }: Props) {
                         </View>
                       )}
                     </View>
-
-                    <Text style={styles.eventTitle}>{fz.event_title}</Text>
-                    <Text style={styles.subText}>🕐 {formatStart(fz.start_time)}</Text>
 
                     {fz.description && (
                       <Text style={[styles.subText, styles.italic]}>{fz.description}</Text>
@@ -235,11 +236,38 @@ export default function VenueDrawer({ onCreateParty }: Props) {
                       </View>
                     )}
 
-                    {/* URL */}
+                    {/* Event page */}
                     {fz.url && (
                       <TouchableOpacity onPress={() => Linking.openURL(fz.url!)} hitSlop={8}>
-                        <Text style={styles.urlLink}>🔗 Event page</Text>
+                        <Text style={styles.urlLink}>Event page</Text>
                       </TouchableOpacity>
+                    )}
+
+                    {/* Check-in — only for events today, disabled until auth (sign in required) */}
+                    {today && (
+                      <View style={styles.checkinBlock} pointerEvents="none">
+                        <Text style={styles.checkinLabelDisabled}>CHECK IN (sign in required)</Text>
+                        <Text style={styles.labelTextDisabled}>How&apos;s the crowd?</Text>
+                        <View style={styles.crowdRow}>
+                          {CROWD_OPTIONS.map((option) => (
+                            <View key={option} style={[styles.optionBtn, styles.optionBtnDisabled]}>
+                              <Text style={[styles.optionBtnText, styles.optionBtnTextDisabled]}>
+                                {CROWD_EMOJI[option!]}{'\n'}{option}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                        <Text style={[styles.labelTextDisabled, { marginTop: 12 }]}>Screen sound on?</Text>
+                        <View style={styles.soundRow}>
+                          {(['On', 'Off'] as const).map((option) => (
+                            <View key={option} style={[styles.optionBtn, styles.optionBtnDisabled]}>
+                              <Text style={[styles.optionBtnText, styles.optionBtnTextDisabled]}>
+                                {option === 'On' ? '🔊 On' : '🔇 Off'}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
                     )}
                   </View>
                 );
@@ -253,8 +281,8 @@ export default function VenueDrawer({ onCreateParty }: Props) {
                 </>
               )}
 
-              {/* Live status */}
-              {liveStatus && (
+              {/* Live status (read-only) */}
+              {liveStatus && (liveStatus.crowd_index || liveStatus.sound || liveStatus.fan_ratio) && (
                 <>
                   <View style={styles.divider} />
                   <View style={styles.liveRow}>
@@ -276,55 +304,6 @@ export default function VenueDrawer({ onCreateParty }: Props) {
                         <Text style={styles.liveValue}>{liveStatus.fan_ratio}</Text>
                       </View>
                     )}
-                  </View>
-                </>
-              )}
-
-              {/* Check-in */}
-              {venueId && (
-                <>
-                  <View style={styles.divider} />
-                  <View style={styles.checkinHeader}>
-                    <Text style={styles.checkinLabel}>CHECK IN</Text>
-                    {saving && <ActivityIndicator size="small" color="#9CA3AF" style={{ marginLeft: 8 }} />}
-                  </View>
-
-                  <Text style={styles.labelText}>How's the crowd?</Text>
-                  <View style={styles.crowdRow}>
-                    {CROWD_OPTIONS.map((option) => {
-                      const selected = liveStatus?.crowd_index === option;
-                      return (
-                        <TouchableOpacity
-                          key={option}
-                          style={[styles.optionBtn, selected && styles.optionBtnSelected]}
-                          onPress={() => checkIn({ crowd_index: option })}
-                          disabled={saving}
-                        >
-                          <Text style={[styles.optionBtnText, selected && styles.optionBtnTextSelected]}>
-                            {CROWD_EMOJI[option!]}{'\n'}{option}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-
-                  <Text style={[styles.labelText, { marginTop: 14 }]}>Sound on?</Text>
-                  <View style={styles.soundRow}>
-                    {(['On', 'Off'] as const).map((option) => {
-                      const selected = liveStatus?.sound === option;
-                      return (
-                        <TouchableOpacity
-                          key={option}
-                          style={[styles.optionBtn, selected && styles.optionBtnSelected]}
-                          onPress={() => checkIn({ sound: option })}
-                          disabled={saving}
-                        >
-                          <Text style={[styles.optionBtnText, selected && styles.optionBtnTextSelected]}>
-                            {option === 'On' ? '🔊 On' : '🔇 Off'}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
                   </View>
                 </>
               )}
@@ -362,14 +341,7 @@ const styles = StyleSheet.create({
   metaText: { fontSize: 13, color: '#4B5563' },
   openText: { color: colors.open },
   closedText: { color: colors.closed },
-  sourceBadge: { paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.full },
-  sourceBadgeText: { fontSize: 11, fontWeight: '600' },
-  sourceMerged: { backgroundColor: colors.mergedBg },
-  sourceMergedText: { color: colors.mergedText },
-  sourceGoogle: { backgroundColor: colors.googleBg },
-  sourceGoogleText: { color: colors.googleText },
   divider: { height: 1, backgroundColor: colors.borderLight, marginVertical: 14 },
-  sectionTitle: { fontSize: 14, fontWeight: '600', color: colors.textSecondary, marginBottom: spacing.xs },
   subText: { fontSize: 12, color: colors.textMuted, marginBottom: 2 },
   italic: { fontStyle: 'italic', marginTop: spacing.xs },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
@@ -378,7 +350,7 @@ const styles = StyleSheet.create({
   tagFaint: { paddingHorizontal: 10, paddingVertical: spacing.xs, backgroundColor: '#F9FAFB', borderRadius: radius.full },
   tagFaintText: { fontSize: 12, color: colors.textMuted, textTransform: 'capitalize' },
   eventBlock: { borderTopWidth: 1, borderTopColor: colors.borderLight, paddingVertical: 12 },
-  eventTitle: { fontSize: 14, fontWeight: '700', color: colors.black, marginTop: 6 },
+  eventTitle: { fontSize: 14, fontWeight: '700', color: colors.black },
   pill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.full },
   pillText: { fontSize: 11, fontWeight: '600' },
   fanZonePill: { backgroundColor: '#FFEDD5' },
@@ -394,17 +366,18 @@ const styles = StyleSheet.create({
   labelText: { fontSize: 12, color: colors.textFaint, marginBottom: spacing.xs },
   liveRow: { flexDirection: 'row', gap: spacing.xxl },
   liveValue: { fontSize: 14, fontWeight: '500', color: colors.black, marginTop: 2 },
-  checkinHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
-  checkinLabel: { fontSize: 11, fontWeight: '700', color: colors.textFaint, letterSpacing: 1 },
+  checkinBlock: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.borderLight, opacity: 0.5 },
+  checkinLabelDisabled: { fontSize: 11, fontWeight: '700', color: colors.textFaint, letterSpacing: 1, marginBottom: spacing.sm },
+  labelTextDisabled: { fontSize: 12, color: colors.textFaint, marginBottom: spacing.xs },
   crowdRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
   soundRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
   optionBtn: {
     flex: 1, paddingVertical: 10, borderRadius: radius.sm,
     borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white, alignItems: 'center',
   },
-  optionBtnSelected: { backgroundColor: colors.black, borderColor: colors.black },
+  optionBtnDisabled: { backgroundColor: colors.white },
   optionBtnText: { fontSize: 12, fontWeight: '500', color: colors.textSecondary, textAlign: 'center' },
-  optionBtnTextSelected: { color: colors.white },
+  optionBtnTextDisabled: { color: colors.textFaint },
   hostBtn: {
     backgroundColor: colors.black,
     marginHorizontal: spacing.xl,
