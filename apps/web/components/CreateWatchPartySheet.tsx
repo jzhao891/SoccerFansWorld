@@ -178,7 +178,7 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
           </label>
           <input
             type="text"
-            placeholder="e.g. WC Watch Party"
+            placeholder="e.g. World Cup 2026 Celebration Festival"
             value={venueName}
             onChange={(e) => setVenueName(e.target.value)}
             className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-800 outline-none focus:border-gray-400 bg-gray-50"

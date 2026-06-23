@@ -32,16 +32,6 @@ function formatStart(ms?: number): string {
   });
 }
 
-// Check-in is only meaningful for an event happening today.
-function isToday(ms?: number): boolean {
-  if (!ms) return false;
-  const d = new Date(ms);
-  const now = new Date();
-  return d.getFullYear() === now.getFullYear()
-    && d.getMonth() === now.getMonth()
-    && d.getDate() === now.getDate();
-}
-
 const DRAWER_HEIGHT = Dimensions.get('window').height * 0.75;
 
 const CROWD_OPTIONS: LiveStatus['crowd_index'][] = ['Chill', 'Buzzing', 'Packed', 'Wild'];
@@ -127,18 +117,6 @@ export default function VenueDrawer({ onCreateParty }: Props) {
         {/* Google / FanZone venue */}
         {place && (
           <>
-            <Pressable
-              style={({ pressed }) => [styles.hostBtn, pressed && styles.hostBtnPressed]}
-              onPress={() => {
-                const src = place.source === 'google' ? 'google' : (rep?.source ?? 'custom');
-                const vid = place.source === 'google' ? place.id : (rep?.venue_id ?? null);
-                // Google place + existing fan zone already carry an address — reuse it (no geocode).
-                const addr = place.source === 'google' ? place.googleData?.vicinity : rep?.address;
-                onCreateParty(place.location, src, vid, addr);
-              }}
-            >
-              <Text style={styles.hostBtnText}>Create fan zone here</Text>
-            </Pressable>
             <ScrollView
               style={styles.scroll}
               contentContainerStyle={styles.scrollContent}
@@ -161,6 +139,20 @@ export default function VenueDrawer({ onCreateParty }: Props) {
                 </TouchableOpacity>
               </View>
 
+              {/* Create fan zone — a component of this venue, below title/address */}
+              <Pressable
+                style={({ pressed }) => [styles.hostBtn, styles.hostBtnInline, pressed && styles.hostBtnPressed]}
+                onPress={() => {
+                  const src = place.source === 'google' ? 'google' : (rep?.source ?? 'custom');
+                  const vid = place.source === 'google' ? place.id : (rep?.venue_id ?? null);
+                  // Google place + existing fan zone already carry an address — reuse it (no geocode).
+                  const addr = place.source === 'google' ? place.googleData?.vicinity : rep?.address;
+                  onCreateParty(place.location, src, vid, addr);
+                }}
+              >
+                <Text style={styles.hostBtnText}>Create fan zone here</Text>
+              </Pressable>
+
               {/* Meta row */}
               {place.googleData && (place.googleData.rating != null || place.googleData.open_now != null) && (
                 <View style={styles.metaRow}>
@@ -178,7 +170,6 @@ export default function VenueDrawer({ onCreateParty }: Props) {
               {/* Events list — sorted by date then name in useMergedPlaces */}
               {events.map((fz) => {
                 const watchParty = isWatchParty(fz);
-                const today = isToday(fz.start_time);
                 return (
                   <View key={fz.id} style={styles.eventBlock}>
                     {/* Title */}
@@ -243,32 +234,30 @@ export default function VenueDrawer({ onCreateParty }: Props) {
                       </TouchableOpacity>
                     )}
 
-                    {/* Check-in — only for events today, disabled until auth (sign in required) */}
-                    {today && (
-                      <View style={styles.checkinBlock} pointerEvents="none">
-                        <Text style={styles.checkinLabelDisabled}>CHECK IN (sign in required)</Text>
-                        <Text style={styles.labelTextDisabled}>How&apos;s the crowd?</Text>
-                        <View style={styles.crowdRow}>
-                          {CROWD_OPTIONS.map((option) => (
-                            <View key={option} style={[styles.optionBtn, styles.optionBtnDisabled]}>
-                              <Text style={[styles.optionBtnText, styles.optionBtnTextDisabled]}>
-                                {CROWD_EMOJI[option!]}{'\n'}{option}
-                              </Text>
-                            </View>
-                          ))}
-                        </View>
-                        <Text style={[styles.labelTextDisabled, { marginTop: 12 }]}>Screen sound on?</Text>
-                        <View style={styles.soundRow}>
-                          {(['On', 'Off'] as const).map((option) => (
-                            <View key={option} style={[styles.optionBtn, styles.optionBtnDisabled]}>
-                              <Text style={[styles.optionBtnText, styles.optionBtnTextDisabled]}>
-                                {option === 'On' ? '🔊 On' : '🔇 Off'}
-                              </Text>
-                            </View>
-                          ))}
-                        </View>
+                    {/* Check-in — per event, disabled until auth (sign in required) */}
+                    <View style={styles.checkinBlock} pointerEvents="none">
+                      <Text style={styles.checkinLabelDisabled}>CHECK IN (sign in required)</Text>
+                      <Text style={styles.labelTextDisabled}>How&apos;s the crowd?</Text>
+                      <View style={styles.crowdRow}>
+                        {CROWD_OPTIONS.map((option) => (
+                          <View key={option} style={[styles.optionBtn, styles.optionBtnDisabled]}>
+                            <Text style={[styles.optionBtnText, styles.optionBtnTextDisabled]}>
+                              {CROWD_EMOJI[option!]}{'\n'}{option}
+                            </Text>
+                          </View>
+                        ))}
                       </View>
-                    )}
+                      <Text style={[styles.labelTextDisabled, { marginTop: 12 }]}>Screen sound on?</Text>
+                      <View style={styles.soundRow}>
+                        {(['On', 'Off'] as const).map((option) => (
+                          <View key={option} style={[styles.optionBtn, styles.optionBtnDisabled]}>
+                            <Text style={[styles.optionBtnText, styles.optionBtnTextDisabled]}>
+                              {option === 'On' ? '🔊 On' : '🔇 Off'}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
                   </View>
                 );
               })}
@@ -387,6 +376,7 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     alignItems: 'center',
   },
+  hostBtnInline: { marginHorizontal: 0, marginTop: spacing.sm, marginBottom: spacing.md },
   hostBtnPressed: { opacity: 0.75 },
   hostBtnText: { fontSize: 14, fontWeight: '600', color: colors.white },
 });
