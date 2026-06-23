@@ -31,15 +31,35 @@ function defaultKickoff() {
   return d;
 }
 
+function coordString(lat: number, lng: number): string {
+  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+}
+
+// Reverse geocode lat/lng -> address via Google Geocoding API (direct call, mirrors
+// how mobile already calls Places). Falls back to a coord string on any failure.
+async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  const key = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
+  if (!key) return coordString(lat, lng);
+  try {
+    const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${key}`);
+    const data = await res.json() as { status: string; results?: { formatted_address: string }[] };
+    if (data.status !== 'OK' || !data.results?.length) return coordString(lat, lng);
+    return data.results[0].formatted_address;
+  } catch {
+    return coordString(lat, lng);
+  }
+}
+
 interface Props {
   visible: boolean;
   onClose: () => void;
   defaultLocation?: { lat: number; lng: number };
   defaultSource?: 'google' | 'osm' | 'custom';
   defaultVenueId?: string | null;
+  defaultAddress?: string; // already-known address (google / existing fan zone); osm & custom geocode
 }
 
-export default function CreateWatchPartySheet({ visible, onClose, defaultLocation, defaultSource, defaultVenueId }: Props) {
+export default function CreateWatchPartySheet({ visible, onClose, defaultLocation, defaultSource, defaultVenueId, defaultAddress }: Props) {
   const bounds = useMapStore((s) => s.bounds);
   const viewState = useMapStore((s) => s.viewState);
 
@@ -63,6 +83,8 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
   const [url, setUrl] = useState('');
   const [gpsLocation, setGpsLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
+  const [address, setAddress] = useState<string | null>(null);
+  const [addressLoading, setAddressLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const translateY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
@@ -86,6 +108,31 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
   const canSubmit = Boolean(
     venueName.trim() && eventTitle.trim() && (!isWatchParty || selectedTeams.length > 0),
   );
+
+  // Resolve a human-readable address for the meeting point. Google places and existing
+  // fan zones already have one (defaultAddress); osm/custom + any GPS override are geocoded.
+  useEffect(() => {
+    if (!visible) return;
+    const { lat, lng } = meetingPoint;
+
+    if (defaultAddress && !gpsLocation) {
+      setAddress(defaultAddress);
+      return;
+    }
+
+    let cancelled = false;
+    setAddressLoading(true);
+    const timer = setTimeout(async () => {
+      const addr = await reverseGeocode(lat, lng);
+      if (!cancelled) {
+        setAddress(addr);
+        setAddressLoading(false);
+      }
+    }, 300);
+
+    return () => { cancelled = true; clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, defaultAddress, gpsLocation, meetingPoint.lat, meetingPoint.lng]);
 
   function toggleTeam(team: string) {
     setSelectedTeams((prev) => {
@@ -155,6 +202,7 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
     setOrganizers('');
     setUrl('');
     setGpsLocation(null);
+    setAddress(null);
     onClose();
   }
 
@@ -171,6 +219,7 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
         event_title: eventTitle.trim(),
         ...(description.trim() ? { description: description.trim() } : {}),
         location: meetingPoint,
+        address: address ?? coordString(meetingPoint.lat, meetingPoint.lng),
         geohash: geohashForLocation([meetingPoint.lat, meetingPoint.lng]),
         start_time: kickoff.getTime(),
         ...(endTime ? { end_time: endTime.getTime() } : {}),
@@ -325,10 +374,12 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
           {/* Meeting point */}
           <Text style={styles.label}>Meeting point</Text>
           <View style={styles.locationRow}>
-            <Text style={styles.locationText} numberOfLines={1}>
-              {gpsLocation
-                ? `GPS: ${gpsLocation.lat.toFixed(4)}, ${gpsLocation.lng.toFixed(4)}`
-                : `Map center (${mapCenter.lat.toFixed(4)}, ${mapCenter.lng.toFixed(4)})`}
+            <Text style={styles.locationText} numberOfLines={2}>
+              {addressLoading
+                ? 'Finding address…'
+                : address
+                  ? `📍 ${address}`
+                  : `${meetingPoint.lat.toFixed(4)}, ${meetingPoint.lng.toFixed(4)}`}
             </Text>
             <TouchableOpacity style={styles.gpsBtn} onPress={useGPS} disabled={gpsLoading}>
               {gpsLoading
