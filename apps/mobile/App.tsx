@@ -14,7 +14,7 @@ import MapContextPopup from './components/MapContextPopup';
 import MapPressActionBar from './components/MapPressActionBar';
 import VenueDrawer from './components/VenueDrawer';
 import CreateWatchPartySheet from './components/CreateWatchPartySheet';
-import type { BoundingBox } from '@sfw/shared';
+import type { BoundingBox, OsmVenue } from '@sfw/shared';
 
 function MapScreen() {
   const setBounds = useMapStore((s) => s.setBounds);
@@ -43,7 +43,7 @@ function MapScreen() {
     setBounds(bounds);
   }
 
-  function handleMapPress(lngLat: { lat: number; lng: number }, screen: { x: number; y: number }) {
+  function handleMapPress(lngLat: { lat: number; lng: number }, screen: { x: number; y: number }, osmVenue?: OsmVenue) {
     const now = Date.now();
     if (now - lastMapPressTime.current < 400) return;
     lastMapPressTime.current = now;
@@ -51,16 +51,24 @@ function MapScreen() {
       suppressNextMapPress.current = false;
       return;
     }
-    // If a venue/osm drawer is open, the first tap just dismisses it (no marker).
-    // A second tap then drops the pin and shows the create action.
-    if (selectedPlaceId !== null || selectedOsmVenue !== null) {
+    // Tapped an OSM POI label — select it (opens the drawer), even from another open drawer.
+    if (osmVenue) {
+      setSelectedPlaceId(null);
+      setSelectedOsmVenue(osmVenue);
+      setMapPressPoint(null);
+      return;
+    }
+    // If anything is open — a venue/OSM drawer or the dropped pin + create popup —
+    // a map tap just dismisses it (no marker). Only when nothing is open does a tap
+    // drop the pin and show the create action. So: tap to close, tap again to create.
+    if (selectedPlaceId !== null || selectedOsmVenue !== null || mapPressPoint !== null) {
       setSelectedPlaceId(null);
       setSelectedOsmVenue(null);
       setMapPressPoint(null);
       return;
     }
     setMapPressScreen(screen);
-    setMapPressPoint((prev) => (prev ? null : lngLat));
+    setMapPressPoint(lngLat);
   }
 
   function openCreateParty(

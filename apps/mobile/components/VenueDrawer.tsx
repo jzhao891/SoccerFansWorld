@@ -32,7 +32,7 @@ function formatStart(ms?: number): string {
   });
 }
 
-const DRAWER_HEIGHT = Dimensions.get('window').height * 0.75;
+const DRAWER_HEIGHT = Dimensions.get('window').height * 0.5;
 
 const CROWD_OPTIONS: LiveStatus['crowd_index'][] = ['Chill', 'Buzzing', 'Packed', 'Wild'];
 
