@@ -2,7 +2,7 @@ import { useRef, useEffect, useMemo, useCallback } from 'react';
 import { StyleSheet, PixelRatio } from 'react-native';
 import Mapbox from '@rnmapbox/maps';
 import { useMapStore, buildFogGeoJSON, ALLOWED_REGIONS } from '@sfw/shared';
-import type { BoundingBox } from '@sfw/shared';
+import type { BoundingBox, OsmVenue } from '@sfw/shared';
 
 Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? '');
 
@@ -12,7 +12,7 @@ const SEATTLE_ZOOM = 13;
 
 interface MapViewProps {
   onBoundsChange?: (bounds: BoundingBox) => void;
-  onMapPress?: (lngLat: { lat: number; lng: number }, screen: { x: number; y: number }) => void;
+  onMapPress?: (lngLat: { lat: number; lng: number }, screen: { x: number; y: number }, osmVenue?: OsmVenue) => void;
   children?: React.ReactNode;
 }
 
@@ -72,6 +72,8 @@ export default function MapView({ onBoundsChange, onMapPress, children }: MapVie
       if (!onMapPress) return;
       if (feature.geometry.type !== 'Point') return;
       const [lng, lat] = feature.geometry.coordinates;
+      const props = (feature.properties ?? {}) as { screenPointX?: number; screenPointY?: number };
+
       let screen = { x: 0, y: 0 };
       try {
         if (mapRef.current) {
@@ -80,7 +82,31 @@ export default function MapView({ onBoundsChange, onMapPress, children }: MapVie
           screen = { x: pt[0] / ratio, y: pt[1] / ratio };
         }
       } catch {}
-      onMapPress({ lat, lng }, screen);
+
+      // Detect a Mapbox-rendered POI label (OSM data, zero network cost) at the tap.
+      let osmVenue: OsmVenue | undefined;
+      try {
+        if (mapRef.current && typeof props.screenPointX === 'number' && typeof props.screenPointY === 'number') {
+          const fc = await mapRef.current.queryRenderedFeaturesAtPoint(
+            [props.screenPointX, props.screenPointY],
+            undefined,
+            ['poi-label'],
+          );
+          const f = fc?.features?.[0];
+          if (f) {
+            const p = (f.properties ?? {}) as { name?: string; class?: string; type?: string };
+            osmVenue = {
+              source: 'osm',
+              id: f.id != null ? `osm-${f.id}` : `osm-${p.name ?? 'unknown'}-${lat.toFixed(5)}-${lng.toFixed(5)}`,
+              name: p.name ?? 'Unknown venue',
+              location: { lat, lng },
+              category: p.class ?? p.type ?? 'place',
+            };
+          }
+        }
+      } catch {}
+
+      onMapPress({ lat, lng }, screen, osmVenue);
     },
     [onMapPress],
   );
