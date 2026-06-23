@@ -10,6 +10,7 @@ import {
   Dimensions,
   Platform,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import * as Location from 'expo-location';
@@ -21,20 +22,32 @@ import { colors, spacing, radius, shadow } from '../theme';
 
 const SHEET_HEIGHT = Dimensions.get('window').height * 0.88;
 
+// "TBD" first so it leads the list and is the default for knockout/unknown matches.
+const TEAM_OPTIONS = ['TBD', ...WORLD_CUP_2026_TEAMS];
+
 function defaultKickoff() {
   const d = new Date();
   d.setHours(d.getHours() + 1, 0, 0, 0);
   return d;
 }
 
-function formatDateTime(d: Date) {
-  return d.toLocaleString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+function coordString(lat: number, lng: number): string {
+  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+}
+
+// Reverse geocode lat/lng -> address via Google Geocoding API (direct call, mirrors
+// how mobile already calls Places). Falls back to a coord string on any failure.
+async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  const key = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
+  if (!key) return coordString(lat, lng);
+  try {
+    const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${key}`);
+    const data = await res.json() as { status: string; results?: { formatted_address: string }[] };
+    if (data.status !== 'OK' || !data.results?.length) return coordString(lat, lng);
+    return data.results[0].formatted_address;
+  } catch {
+    return coordString(lat, lng);
+  }
 }
 
 interface Props {
@@ -43,9 +56,10 @@ interface Props {
   defaultLocation?: { lat: number; lng: number };
   defaultSource?: 'google' | 'osm' | 'custom';
   defaultVenueId?: string | null;
+  defaultAddress?: string; // already-known address (google / existing fan zone); osm & custom geocode
 }
 
-export default function CreateWatchPartySheet({ visible, onClose, defaultLocation, defaultSource, defaultVenueId }: Props) {
+export default function CreateWatchPartySheet({ visible, onClose, defaultLocation, defaultSource, defaultVenueId, defaultAddress }: Props) {
   const bounds = useMapStore((s) => s.bounds);
   const viewState = useMapStore((s) => s.viewState);
 
@@ -53,15 +67,24 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
     ? { lat: (bounds.north + bounds.south) / 2, lng: (bounds.east + bounds.west) / 2 }
     : { lat: viewState.latitude, lng: viewState.longitude });
 
-  const [partyName, setPartyName] = useState('');
+  const [venueName, setVenueName] = useState('');
   const [eventTitle, setEventTitle] = useState('');
   const [description, setDescription] = useState('');
   const [kickoff, setKickoff] = useState<Date>(defaultKickoff);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+  const [endTime, setEndTime] = useState<Date | null>(null);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+  const [isWatchParty, setIsWatchParty] = useState(true);
+  const [selectedTeams, setSelectedTeams] = useState<string[]>(['TBD']);
+  const [admission, setAdmission] = useState<'free' | 'paid'>('free');
+  const [organizers, setOrganizers] = useState('');
+  const [url, setUrl] = useState('');
   const [gpsLocation, setGpsLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
+  const [address, setAddress] = useState<string | null>(null);
+  const [addressLoading, setAddressLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const translateY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
@@ -76,16 +99,47 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
     if (!visible) {
       setShowDatePicker(false);
       setShowTimePicker(false);
+      setShowEndDatePicker(false);
+      setShowEndTimePicker(false);
     }
   }, [visible, translateY]);
 
   const meetingPoint = gpsLocation ?? mapCenter;
-  const canSubmit = partyName.trim() && eventTitle.trim();
+  const canSubmit = Boolean(
+    venueName.trim() && eventTitle.trim() && (!isWatchParty || selectedTeams.length > 0),
+  );
+
+  // Resolve a human-readable address for the meeting point. Google places and existing
+  // fan zones already have one (defaultAddress); osm/custom + any GPS override are geocoded.
+  useEffect(() => {
+    if (!visible) return;
+    const { lat, lng } = meetingPoint;
+
+    if (defaultAddress && !gpsLocation) {
+      setAddress(defaultAddress);
+      return;
+    }
+
+    let cancelled = false;
+    setAddressLoading(true);
+    const timer = setTimeout(async () => {
+      const addr = await reverseGeocode(lat, lng);
+      if (!cancelled) {
+        setAddress(addr);
+        setAddressLoading(false);
+      }
+    }, 300);
+
+    return () => { cancelled = true; clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, defaultAddress, gpsLocation, meetingPoint.lat, meetingPoint.lng]);
 
   function toggleTeam(team: string) {
-    setSelectedTeams((prev) =>
-      prev.includes(team) ? prev.filter((t) => t !== team) : [...prev, team],
-    );
+    setSelectedTeams((prev) => {
+      if (prev.includes(team)) return prev.filter((t) => t !== team);
+      if (prev.length >= 2) return prev; // a match has at most two teams
+      return [...prev, team];
+    });
   }
 
   async function useGPS() {
@@ -118,13 +172,37 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
     }
   }
 
+  function handleEndDateChange(_: DateTimePickerEvent, selected?: Date) {
+    if (Platform.OS === 'android') setShowEndDatePicker(false);
+    if (selected) {
+      const next = new Date(endTime ?? kickoff);
+      next.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
+      setEndTime(next);
+    }
+  }
+
+  function handleEndTimeChange(_: DateTimePickerEvent, selected?: Date) {
+    if (Platform.OS === 'android') setShowEndTimePicker(false);
+    if (selected) {
+      const next = new Date(endTime ?? kickoff);
+      next.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
+      setEndTime(next);
+    }
+  }
+
   function resetAndClose() {
-    setPartyName('');
+    setVenueName('');
     setEventTitle('');
     setDescription('');
     setKickoff(defaultKickoff());
-    setSelectedTeams([]);
+    setEndTime(null);
+    setIsWatchParty(true);
+    setSelectedTeams(['TBD']);
+    setAdmission('free');
+    setOrganizers('');
+    setUrl('');
     setGpsLocation(null);
+    setAddress(null);
     onClose();
   }
 
@@ -132,19 +210,26 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
     if (!canSubmit || saving) return;
     setSaving(true);
     try {
+      const organizerList = organizers.split(',').map((o) => o.trim()).filter(Boolean);
       const ref = doc(collection(db, 'venues'));
       await setDoc(ref, {
         source: defaultSource ?? 'custom',
         venue_id: defaultVenueId ?? null,
-        name: partyName.trim(),
+        name: venueName.trim(),
         event_title: eventTitle.trim(),
         ...(description.trim() ? { description: description.trim() } : {}),
         location: meetingPoint,
+        address: address ?? coordString(meetingPoint.lat, meetingPoint.lng),
         geohash: geohashForLocation([meetingPoint.lat, meetingPoint.lng]),
-        kickoff_time: kickoff.getTime(),
-        watching_teams: selectedTeams,
+        start_time: kickoff.getTime(),
+        ...(endTime ? { end_time: endTime.getTime() } : {}),
+        // watching_teams present => watch party; omitted => Fan Zone only
+        ...(isWatchParty ? { watching_teams: selectedTeams } : {}),
+        admission,
         amenities: [],
-        is_active: true,
+        ...(organizerList.length ? { organizers: organizerList } : {}),
+        ...(url.trim() ? { url: url.trim() } : {}),
+        is_active: false, // created inactive; a moderation sweep validates + activates it (see BACKLOGS.md)
         created_by: '',
         created_at: Date.now(),
       });
@@ -166,26 +251,26 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
         </TouchableOpacity>
 
         <View style={styles.header}>
-          <Text style={styles.title}>Host a watch party</Text>
+          <Text style={styles.title}>Create a fan zone</Text>
           <TouchableOpacity onPress={resetAndClose} hitSlop={8}>
             <Text style={styles.closeBtn}>✕</Text>
           </TouchableOpacity>
         </View>
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-          {/* Party name */}
-          <Text style={styles.label}>Party name <Text style={styles.required}>*</Text></Text>
+          {/* Venue name */}
+          <Text style={styles.label}>Venue name <Text style={styles.required}>*</Text></Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g. WC Watch Party"
+            placeholder="e.g. World Cup 2026 Celebration Festival"
             placeholderTextColor={colors.textFaint}
-            value={partyName}
-            onChangeText={setPartyName}
+            value={venueName}
+            onChangeText={setVenueName}
             returnKeyType="next"
           />
 
           {/* Event title */}
-          <Text style={styles.label}>What are you watching? <Text style={styles.required}>*</Text></Text>
+          <Text style={styles.label}>Event title <Text style={styles.required}>*</Text></Text>
           <TextInput
             style={styles.input}
             placeholder="e.g. USA vs England — Group Stage"
@@ -195,8 +280,21 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
             returnKeyType="next"
           />
 
-          {/* Date & time */}
-          <Text style={styles.label}>Date & time <Text style={styles.required}>*</Text></Text>
+          {/* Event description */}
+          <Text style={styles.label}>Event description <Text style={styles.optional}>(optional)</Text></Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            placeholder="e.g. Meet here first, then we'll head somewhere together"
+            placeholderTextColor={colors.textFaint}
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            numberOfLines={3}
+            textAlignVertical="top"
+          />
+
+          {/* Start */}
+          <Text style={styles.label}>Start <Text style={styles.required}>*</Text></Text>
           <View style={styles.dateRow}>
             <TouchableOpacity style={styles.dateBtn} onPress={() => { setShowDatePicker(true); setShowTimePicker(false); }}>
               <Text style={styles.dateBtnText}>
@@ -228,13 +326,60 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
             />
           )}
 
+          {/* End (optional) */}
+          <Text style={styles.label}>End <Text style={styles.optional}>(optional)</Text></Text>
+          {endTime ? (
+            <View style={styles.dateRow}>
+              <TouchableOpacity style={styles.dateBtn} onPress={() => { setShowEndDatePicker(true); setShowEndTimePicker(false); }}>
+                <Text style={styles.dateBtnText}>
+                  {endTime.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.dateBtn} onPress={() => { setShowEndTimePicker(true); setShowEndDatePicker(false); }}>
+                <Text style={styles.dateBtnText}>
+                  {endTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.clearBtn} onPress={() => { setEndTime(null); setShowEndDatePicker(false); setShowEndTimePicker(false); }} hitSlop={8}>
+                <Text style={styles.clearBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={() => setEndTime(new Date(kickoff.getTime() + 2 * 60 * 60 * 1000))}
+            >
+              <Text style={styles.addBtnText}>Add end time</Text>
+            </TouchableOpacity>
+          )}
+
+          {showEndDatePicker && (
+            <DateTimePicker
+              value={endTime ?? kickoff}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'inline' : 'default'}
+              minimumDate={kickoff}
+              onChange={handleEndDateChange}
+            />
+          )}
+          {showEndTimePicker && (
+            <DateTimePicker
+              value={endTime ?? kickoff}
+              mode="time"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={handleEndTimeChange}
+            />
+          )}
+
           {/* Meeting point */}
           <Text style={styles.label}>Meeting point</Text>
           <View style={styles.locationRow}>
-            <Text style={styles.locationText} numberOfLines={1}>
-              {gpsLocation
-                ? `GPS: ${gpsLocation.lat.toFixed(4)}, ${gpsLocation.lng.toFixed(4)}`
-                : `Map center (${mapCenter.lat.toFixed(4)}, ${mapCenter.lng.toFixed(4)})`}
+            <Text style={styles.locationText} numberOfLines={2}>
+              {addressLoading
+                ? 'Finding address…'
+                : address
+                  ? `📍 ${address}`
+                  : `${meetingPoint.lat.toFixed(4)}, ${meetingPoint.lng.toFixed(4)}`}
             </Text>
             <TouchableOpacity style={styles.gpsBtn} onPress={useGPS} disabled={gpsLoading}>
               {gpsLoading
@@ -243,38 +388,84 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
             </TouchableOpacity>
           </View>
 
-          {/* Teams */}
-          <Text style={styles.label}>
-            Teams{selectedTeams.length > 0 ? ` (${selectedTeams.length})` : ''}
-          </Text>
-          <View style={styles.teamGrid}>
-            {WORLD_CUP_2026_TEAMS.map((team) => {
-              const active = selectedTeams.includes(team);
+          {/* Watch party toggle */}
+          <View style={styles.toggleRow}>
+            <Text style={[styles.label, styles.toggleLabel]}>Watch party?</Text>
+            <Switch
+              value={isWatchParty}
+              onValueChange={setIsWatchParty}
+              trackColor={{ false: colors.border, true: colors.black }}
+              thumbColor={colors.white}
+            />
+          </View>
+
+          {/* Teams — only when this is a watch party */}
+          {isWatchParty && (
+            <>
+              <Text style={styles.label}>
+                Teams <Text style={styles.optional}>(pick up to 2)</Text>
+                {selectedTeams.length > 0 ? ` — ${selectedTeams.length}` : ''}
+              </Text>
+              <View style={styles.teamGrid}>
+                {TEAM_OPTIONS.map((team) => {
+                  const active = selectedTeams.includes(team);
+                  return (
+                    <TouchableOpacity
+                      key={team}
+                      style={[styles.teamPill, active && styles.teamPillActive]}
+                      onPress={() => toggleTeam(team)}
+                    >
+                      <Text style={[styles.teamPillText, active && styles.teamPillTextActive]}>
+                        {team}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </>
+          )}
+
+          {/* Admission */}
+          <Text style={styles.label}>Admission <Text style={styles.required}>*</Text></Text>
+          <View style={styles.admissionRow}>
+            {(['free', 'paid'] as const).map((opt) => {
+              const active = admission === opt;
               return (
                 <TouchableOpacity
-                  key={team}
-                  style={[styles.teamPill, active && styles.teamPillActive]}
-                  onPress={() => toggleTeam(team)}
+                  key={opt}
+                  style={[styles.admissionBtn, active && styles.admissionBtnActive]}
+                  onPress={() => setAdmission(opt)}
                 >
-                  <Text style={[styles.teamPillText, active && styles.teamPillTextActive]}>
-                    {team}
+                  <Text style={[styles.admissionBtnText, active && styles.admissionBtnTextActive]}>
+                    {opt === 'free' ? 'Free' : 'Paid'}
                   </Text>
                 </TouchableOpacity>
               );
             })}
           </View>
 
-          {/* Description */}
-          <Text style={styles.label}>Description <Text style={styles.optional}>(optional)</Text></Text>
+          {/* Organizers */}
+          <Text style={styles.label}>Organizers <Text style={styles.optional}>(optional, comma-separated)</Text></Text>
           <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="e.g. Meet here first, then we'll head somewhere together"
+            style={styles.input}
+            placeholder="e.g. Local Supporters Club, Pub Co"
             placeholderTextColor={colors.textFaint}
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
+            value={organizers}
+            onChangeText={setOrganizers}
+            returnKeyType="next"
+          />
+
+          {/* URL */}
+          <Text style={styles.label}>Event page URL <Text style={styles.optional}>(optional)</Text></Text>
+          <TextInput
+            style={styles.input}
+            placeholder="https://…"
+            placeholderTextColor={colors.textFaint}
+            value={url}
+            onChangeText={setUrl}
+            autoCapitalize="none"
+            keyboardType="url"
+            returnKeyType="done"
           />
 
           {/* Submit */}
@@ -285,7 +476,7 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
           >
             {saving
               ? <ActivityIndicator size="small" color={colors.white} />
-              : <Text style={styles.submitText}>Create watch party</Text>}
+              : <Text style={styles.submitText}>Create fan zone</Text>}
           </TouchableOpacity>
 
           <View style={{ height: spacing.xl }} />
@@ -356,7 +547,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   textArea: { minHeight: 80, paddingTop: 10 },
-  dateRow: { flexDirection: 'row', gap: spacing.sm },
+  dateRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
   dateBtn: {
     flex: 1,
     backgroundColor: colors.bgSubtle,
@@ -367,6 +558,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dateBtnText: { fontSize: 14, color: colors.textPrimary, fontWeight: '500' },
+  clearBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clearBtnText: { fontSize: 14, color: colors.textFaint },
+  addBtn: {
+    backgroundColor: colors.bgSubtle,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  addBtnText: { fontSize: 14, color: colors.textSecondary, fontWeight: '500' },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -390,6 +601,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   gpsBtnText: { fontSize: 13, color: colors.textSecondary, fontWeight: '500' },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md },
+  toggleLabel: { marginTop: 0, marginBottom: 0 },
   teamGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   teamPill: {
     paddingHorizontal: spacing.md,
@@ -402,6 +615,19 @@ const styles = StyleSheet.create({
   teamPillActive: { backgroundColor: colors.black, borderColor: colors.black },
   teamPillText: { fontSize: 12, fontWeight: '500', color: colors.textSecondary },
   teamPillTextActive: { color: colors.white },
+  admissionRow: { flexDirection: 'row', gap: spacing.sm },
+  admissionBtn: {
+    flex: 1,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  admissionBtnActive: { backgroundColor: colors.black, borderColor: colors.black },
+  admissionBtnText: { fontSize: 14, color: colors.textSecondary, fontWeight: '500' },
+  admissionBtnTextActive: { color: colors.white },
   submitBtn: {
     marginTop: spacing.xl,
     backgroundColor: colors.black,

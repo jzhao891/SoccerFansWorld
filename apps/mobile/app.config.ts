@@ -23,6 +23,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'ai.fandar.app',
+    versionCode: 2,
     adaptiveIcon: {
       backgroundColor: '#E6F4FE',
       foregroundImage: './assets/android-icon-foreground.png',
@@ -40,7 +41,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-location',
       {
-        locationWhenInUsePermission: 'Allow Fandar AI to use your location to find fan venues near you.',
+        locationWhenInUsePermission: 'Allow FandarAI to use your location to find fan venues near you.',
       },
     ],
   ],

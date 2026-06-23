@@ -2,10 +2,6 @@
 
 ## 🔴 High Importance / High Urgency
 
-- **Deploy web app to Vercel:** Connect the GitHub repo to Vercel, configure all environment variables (Firebase, Google Places, Mapbox), and enable auto-deploy on push to `main`. Set the custom domain once purchased.
-
-- **Domain setup:** Purchase domain, then wire DNS to Vercel's DNS target (A/CNAME). If using Cloudflare + Route 53, update Cloudflare's nameservers to point at the Route 53 NS records, then add the Vercel CNAME in Route 53.
-
 - **Authentication flow:** Add Firebase Auth (Google/Apple sign-in) so actions like creating a watch party, checking in, and RSVPing are tied to a real user identity. Required before shipping RSVP or host controls. `created_by` field in FanZone already expects a user ID — currently unpopulated.
 
 - **Firestore security rules:** Currently all Firestore reads and writes are open. Add proper security rules: `live_statuses` and `venues` should require Auth for writes; read access can remain open. Watch party creation (`venues` collection) should only allow writes from authenticated users and enforce that `created_by` matches the requesting user's UID. Consider rate-limiting rules to prevent abuse.
@@ -14,13 +10,15 @@
 
 - **Apple Sign in with Apple — complete Service ID configuration:** Blocked until the iOS App ID (bundle ID) is registered. See `INFRASTRUCTURES.md` → Firebase Auth → Step 4 for the exact steps to complete.
 
-- **Support page (`fandar.ai/support`):** Create `apps/web/app/support/page.tsx` with contact email (`footballfansworld.labs@gmail.com`), data deletion request instructions, and basic FAQ. Required by both App Store and Play Store — referenced in the privacy policy.
-
-- **Multiple watch parties at the same location:** Multiple FanZone docs can share the same `venue_id`, but `useMergedPlaces` currently surfaces one pin per location. Need to decide: (1) pin rendering — cluster badge with count, or offset overlapping pins radially; (2) drawer UX — tapping a cluster shows a list of all parties at that location before drilling into one.
+- **Fan zone moderation sweep:** User-created fan zones are written `is_active: false` (pending moderation), so they do not appear on the map until approved. Write a sweep that scans inactive `venues` docs, validates each against the FanZone contract (required fields present; valid `source`/`admission`/`location`; `start_time` present; `watching_teams` entries are known teams or `TBD`), and flips `is_active: true` for passing docs — failing docs stay inactive and are logged for manual review. Run on demand for now; designed to be lifted into a scheduled job (Cloud Function / cron). Until this runs, newly created fan zones stay hidden.
 
 ---
 
 ## 🟠 High Importance / Low Urgency
+
+- **LLM-powered venue creation from URL or text prompt:** Allow admins or users to paste an event URL or raw text description. An LLM parses the input and extracts structured FanZone fields (name, address, event_title, start_time, end_time, watching_teams, amenities, organizer, url, description). For seeding: bulk-generate many docs from a single schedule page (e.g. a venue hosting 30+ World Cup watch parties). For users: pre-fill the creation form for review and confirmation before submitting to Firestore.
+
+- **Automated venue ingestion pipeline:** Unattended backend pipeline (scheduled/cron) that (1) crawls public internet sources — city / host-committee event pages, venue sites, fan-zone listings — for World Cup watch-party events; (2) uses an LLM to normalize each into the `venues.json` schema (validated team names, ISO start/end times with offsets, admission, amenities, organizers, url); (3) runs the existing `seed-venues.ts` writer to upsert into Firestore (reusing its Places lookup, geohash, validation, and dedupe). Distinct from the user-facing "LLM venue creation from URL/text" feature above — this is a bulk discovery-and-ingestion job, not a form helper. The current seed script is only stage 3; this item adds the crawl + LLM-extraction stages in front of it.
 
 - **Submit mobile app to App Store:** Run `npx eas build --profile production --platform ios` to produce a signed `.ipa`, then `npx eas submit --platform ios` to push to TestFlight for internal testing before App Store review. Requires Apple Developer account and production Firebase config.
 
@@ -31,6 +29,8 @@
 - **Check-in trust model (Option A — voting with decay):** Replace the current last-write-wins check-in with an aggregated voting system. Store individual check-ins as timestamped votes in a `check_ins` subcollection under each venue. Compute `crowd_index` and `sound` from votes within a rolling time window (e.g. last 30 min), weighted so recent votes count more and old votes expire. The `live_statuses` doc becomes a computed summary rather than a direct user write. Requires either Firebase Cloud Functions for server-side aggregation or client-side recomputation on each check-in.
 
 - **Match info:** Display match info (e.g. dates, teams, live stats) on the main page or map page to give users soccer context alongside venue data.
+
+- **Fan zone expiry sweep:** Separate scheduled sweep that retires past events so the `venues` collection doesn't accumulate stale docs. Treat an event as complete when `end_time ?? (start_time + ~3h default window) < now`; after a grace period, deactivate (`is_active: false`) or delete it. Runs independently of the moderation sweep. `end_time` is optional and only sharpens the estimate.
 
 ---
 

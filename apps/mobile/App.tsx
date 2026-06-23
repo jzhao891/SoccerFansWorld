@@ -14,18 +14,21 @@ import MapContextPopup from './components/MapContextPopup';
 import MapPressActionBar from './components/MapPressActionBar';
 import VenueDrawer from './components/VenueDrawer';
 import CreateWatchPartySheet from './components/CreateWatchPartySheet';
-import type { BoundingBox } from '@sfw/shared';
+import type { BoundingBox, OsmVenue } from '@sfw/shared';
 
 function MapScreen() {
   const setBounds = useMapStore((s) => s.setBounds);
   const selectedPlaceId = useMapStore((s) => s.selectedPlaceId);
   const setSelectedPlaceId = useMapStore((s) => s.setSelectedPlaceId);
+  const selectedOsmVenue = useMapStore((s) => s.selectedOsmVenue);
+  const setSelectedOsmVenue = useMapStore((s) => s.setSelectedOsmVenue);
   const [mapPressPoint, setMapPressPoint] = useState<{ lat: number; lng: number } | null>(null);
   const [mapPressScreen, setMapPressScreen] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [createPartyOpen, setCreatePartyOpen] = useState(false);
   const [createPartyLocation, setCreatePartyLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [createPartySource, setCreatePartySource] = useState<'google' | 'osm' | 'custom'>('custom');
   const [createPartyVenueId, setCreatePartyVenueId] = useState<string | null>(null);
+  const [createPartyAddress, setCreatePartyAddress] = useState<string | undefined>(undefined);
   const suppressNextMapPress = useRef(false);
   const lastMapPressTime = useRef(0);
 
@@ -40,7 +43,7 @@ function MapScreen() {
     setBounds(bounds);
   }
 
-  function handleMapPress(lngLat: { lat: number; lng: number }, screen: { x: number; y: number }) {
+  function handleMapPress(lngLat: { lat: number; lng: number }, screen: { x: number; y: number }, osmVenue?: OsmVenue) {
     const now = Date.now();
     if (now - lastMapPressTime.current < 400) return;
     lastMapPressTime.current = now;
@@ -48,20 +51,37 @@ function MapScreen() {
       suppressNextMapPress.current = false;
       return;
     }
-    setSelectedPlaceId(null);
+    // Tapped an OSM POI label — select it (opens the drawer), even from another open drawer.
+    if (osmVenue) {
+      setSelectedPlaceId(null);
+      setSelectedOsmVenue(osmVenue);
+      setMapPressPoint(null);
+      return;
+    }
+    // If anything is open — a venue/OSM drawer or the dropped pin + create popup —
+    // a map tap just dismisses it (no marker). Only when nothing is open does a tap
+    // drop the pin and show the create action. So: tap to close, tap again to create.
+    if (selectedPlaceId !== null || selectedOsmVenue !== null || mapPressPoint !== null) {
+      setSelectedPlaceId(null);
+      setSelectedOsmVenue(null);
+      setMapPressPoint(null);
+      return;
+    }
     setMapPressScreen(screen);
-    setMapPressPoint((prev) => (prev ? null : lngLat));
+    setMapPressPoint(lngLat);
   }
 
   function openCreateParty(
     location: { lat: number; lng: number },
     source: 'google' | 'osm' | 'custom' = 'custom',
     venue_id: string | null = null,
+    address?: string,
   ) {
     suppressNextMapPress.current = true;
     setCreatePartyLocation(location);
     setCreatePartySource(source);
     setCreatePartyVenueId(venue_id);
+    setCreatePartyAddress(address);
     setMapPressPoint(null);
     setCreatePartyOpen(true);
   }
@@ -88,6 +108,7 @@ function MapScreen() {
         defaultLocation={createPartyLocation ?? undefined}
         defaultSource={createPartySource}
         defaultVenueId={createPartyVenueId}
+        defaultAddress={createPartyAddress}
         onClose={() => { setCreatePartyOpen(false); setCreatePartyLocation(null); }}
       />
       <StatusBar style="auto" />

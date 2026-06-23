@@ -1,5 +1,5 @@
 export const metadata = {
-  title: 'Privacy Policy — Fandar AI',
+  title: 'Privacy Policy — FandarAI',
 };
 
 export default function PrivacyPage() {
@@ -8,7 +8,7 @@ export default function PrivacyPage() {
       <h1 className="text-3xl font-bold mb-8">Privacy Policy</h1>
 
       <p className="mb-8 text-gray-600">
-        This privacy policy applies to the mobile and web application Fandar (herein referred to as
+        This privacy policy applies to the mobile and web application FandarAI (herein referred to as
         &ldquo;Application&rdquo;), which was created as a Commercial service. This service is
         intended for use &ldquo;AS IS&rdquo;.
       </p>
