@@ -10,6 +10,7 @@ import {
   Dimensions,
   Platform,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import * as Location from 'expo-location';
@@ -20,6 +21,9 @@ import { useMapStore, WORLD_CUP_2026_TEAMS } from '@sfw/shared';
 import { colors, spacing, radius, shadow } from '../theme';
 
 const SHEET_HEIGHT = Dimensions.get('window').height * 0.88;
+
+// "TBD" first so it leads the list and is the default for knockout/unknown matches.
+const TEAM_OPTIONS = ['TBD', ...WORLD_CUP_2026_TEAMS];
 
 function defaultKickoff() {
   const d = new Date();
@@ -52,7 +56,8 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
   const [endTime, setEndTime] = useState<Date | null>(null);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
-  const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+  const [isWatchParty, setIsWatchParty] = useState(true);
+  const [selectedTeams, setSelectedTeams] = useState<string[]>(['TBD']);
   const [admission, setAdmission] = useState<'free' | 'paid'>('free');
   const [organizers, setOrganizers] = useState('');
   const [url, setUrl] = useState('');
@@ -78,12 +83,16 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
   }, [visible, translateY]);
 
   const meetingPoint = gpsLocation ?? mapCenter;
-  const canSubmit = Boolean(venueName.trim() && eventTitle.trim());
+  const canSubmit = Boolean(
+    venueName.trim() && eventTitle.trim() && (!isWatchParty || selectedTeams.length > 0),
+  );
 
   function toggleTeam(team: string) {
-    setSelectedTeams((prev) =>
-      prev.includes(team) ? prev.filter((t) => t !== team) : [...prev, team],
-    );
+    setSelectedTeams((prev) => {
+      if (prev.includes(team)) return prev.filter((t) => t !== team);
+      if (prev.length >= 2) return prev; // a match has at most two teams
+      return [...prev, team];
+    });
   }
 
   async function useGPS() {
@@ -140,7 +149,8 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
     setDescription('');
     setKickoff(defaultKickoff());
     setEndTime(null);
-    setSelectedTeams([]);
+    setIsWatchParty(true);
+    setSelectedTeams(['TBD']);
     setAdmission('free');
     setOrganizers('');
     setUrl('');
@@ -164,7 +174,8 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
         geohash: geohashForLocation([meetingPoint.lat, meetingPoint.lng]),
         start_time: kickoff.getTime(),
         ...(endTime ? { end_time: endTime.getTime() } : {}),
-        watching_teams: selectedTeams,
+        // watching_teams present => watch party; omitted => Fan Zone only
+        ...(isWatchParty ? { watching_teams: selectedTeams } : {}),
         admission,
         amenities: [],
         ...(organizerList.length ? { organizers: organizerList } : {}),
@@ -326,26 +337,42 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
             </TouchableOpacity>
           </View>
 
-          {/* Teams */}
-          <Text style={styles.label}>
-            Teams{selectedTeams.length > 0 ? ` (${selectedTeams.length})` : ''}
-          </Text>
-          <View style={styles.teamGrid}>
-            {WORLD_CUP_2026_TEAMS.map((team) => {
-              const active = selectedTeams.includes(team);
-              return (
-                <TouchableOpacity
-                  key={team}
-                  style={[styles.teamPill, active && styles.teamPillActive]}
-                  onPress={() => toggleTeam(team)}
-                >
-                  <Text style={[styles.teamPillText, active && styles.teamPillTextActive]}>
-                    {team}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+          {/* Watch party toggle */}
+          <View style={styles.toggleRow}>
+            <Text style={[styles.label, styles.toggleLabel]}>Watch party?</Text>
+            <Switch
+              value={isWatchParty}
+              onValueChange={setIsWatchParty}
+              trackColor={{ false: colors.border, true: colors.black }}
+              thumbColor={colors.white}
+            />
           </View>
+
+          {/* Teams — only when this is a watch party */}
+          {isWatchParty && (
+            <>
+              <Text style={styles.label}>
+                Teams <Text style={styles.optional}>(pick up to 2)</Text>
+                {selectedTeams.length > 0 ? ` — ${selectedTeams.length}` : ''}
+              </Text>
+              <View style={styles.teamGrid}>
+                {TEAM_OPTIONS.map((team) => {
+                  const active = selectedTeams.includes(team);
+                  return (
+                    <TouchableOpacity
+                      key={team}
+                      style={[styles.teamPill, active && styles.teamPillActive]}
+                      onPress={() => toggleTeam(team)}
+                    >
+                      <Text style={[styles.teamPillText, active && styles.teamPillTextActive]}>
+                        {team}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </>
+          )}
 
           {/* Admission */}
           <Text style={styles.label}>Admission <Text style={styles.required}>*</Text></Text>
@@ -523,6 +550,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   gpsBtnText: { fontSize: 13, color: colors.textSecondary, fontWeight: '500' },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md },
+  toggleLabel: { marginTop: 0, marginBottom: 0 },
   teamGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   teamPill: {
     paddingHorizontal: spacing.md,
