@@ -26,6 +26,7 @@ function MapScreen() {
   const [createPartyLocation, setCreatePartyLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [createPartySource, setCreatePartySource] = useState<'google' | 'osm' | 'custom'>('custom');
   const [createPartyVenueId, setCreatePartyVenueId] = useState<string | null>(null);
+  const [createPartyAddress, setCreatePartyAddress] = useState<string | undefined>(undefined);
   const suppressNextMapPress = useRef(false);
   const lastMapPressTime = useRef(0);
 
@@ -57,11 +58,13 @@ function MapScreen() {
     location: { lat: number; lng: number },
     source: 'google' | 'osm' | 'custom' = 'custom',
     venue_id: string | null = null,
+    address?: string,
   ) {
     suppressNextMapPress.current = true;
     setCreatePartyLocation(location);
     setCreatePartySource(source);
     setCreatePartyVenueId(venue_id);
+    setCreatePartyAddress(address);
     setMapPressPoint(null);
     setCreatePartyOpen(true);
   }
@@ -88,6 +91,7 @@ function MapScreen() {
         defaultLocation={createPartyLocation ?? undefined}
         defaultSource={createPartySource}
         defaultVenueId={createPartyVenueId}
+        defaultAddress={createPartyAddress}
         onClose={() => { setCreatePartyOpen(false); setCreatePartyLocation(null); }}
       />
       <StatusBar style="auto" />
