@@ -4,9 +4,6 @@
   "private": true,
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "scripts": {
-    "test": "vitest run"
-  },
   "dependencies": {
     "geofire-common": "^6.0.0",
     "zustand": "^5.0.14"
@@ -14,10 +11,5 @@
   "peerDependencies": {
     "firebase": ">=10.0.0",
     "react": ">=18.0.0"
-  },
-  "devDependencies": {
-    "dotenv": "^17.4.2",
-    "tsx": "^4.22.4",
-    "vitest": "^4.1.9"
   }
 }

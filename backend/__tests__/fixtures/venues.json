@@ -1,0 +1,27 @@
+[
+  {
+    "venue_name": "Test Fan Zone",
+    "venue_search_query": "Test Venue, Seattle WA",
+    "events": [
+      {
+        "event_title": "USA vs. England — Group Stage",
+        "start_time": "2026-06-15T14:30:00-07:00",
+        "watching_teams": ["USA", "England"],
+        "admission": "free",
+        "amenities": ["big screen", "beer garden"]
+      },
+      {
+        "event_title": "Round of 32 – TBD",
+        "watching_teams": ["TBD"],
+        "admission": "paid",
+        "amenities": []
+      },
+      {
+        "event_title": "Türkiye vs. South Korea",
+        "watching_teams": ["Türkiye", "South Korea"],
+        "admission": "free",
+        "amenities": ["food trucks"]
+      }
+    ]
+  }
+]

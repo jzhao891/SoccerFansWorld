@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { geohashForLocation } from 'geofire-common';
-import { WORLD_CUP_2026_TEAMS as KNOWN_TEAM_NAMES } from '../constants';
+import { WORLD_CUP_2026_TEAMS as KNOWN_TEAM_NAMES } from '@sfw/shared';
 
 dotenv.config({ path: path.resolve(process.cwd(), 'apps/web/.env.local') });
 
@@ -174,7 +174,7 @@ async function main() {
   createLogger(logPath);
   log.info(`Logging to ${logPath}\n`);
 
-  const venuesPath = path.resolve(process.cwd(), 'packages/shared/src/scripts/resources/venues3.json');
+  const venuesPath = path.resolve(process.cwd(), 'backend/resources/venues3.json');
   if (!fs.existsSync(venuesPath)) {
     log.error(`venues.json not found at ${venuesPath}`);
     process.exit(1);
