@@ -12,6 +12,12 @@
 
 - **Fan zone moderation sweep:** User-created fan zones are written `is_active: false` (pending moderation), so they do not appear on the map until approved. Write a sweep that scans inactive `venues` docs, validates each against the FanZone contract (required fields present; valid `source`/`admission`/`location`; `start_time` present; `watching_teams` entries are known teams or `TBD`), and flips `is_active: true` for passing docs — failing docs stay inactive and are logged for manual review. Run on demand for now; designed to be lifted into a scheduled job (Cloud Function / cron). Until this runs, newly created fan zones stay hidden.
 
+- **Secure check-in / live-status writes:** Re-enable check-ins (currently disabled in the UI). Three distinct concerns, each with its own tool:
+  1. **Don't expose raw data** — the public `live_statuses` summary is fine to read (it's the "Crowded?" we display), but individual votes must not be client-readable. Put raw votes in a separate `check_ins` collection with `allow read: if false` (clients write-only). Solved by rules + data model — **no auth needed.**
+  2. **Limit volume/spam writes** (e.g. a script writing hundreds of docs/sec) — security rules are stateless and **cannot rate-limit**. Mitigate with **App Check** (only the genuine app can write), per-doc shape/size validation, and **budget alerts**. **Not solved by auth.**
+  3. **Vote integrity** (stop one actor casting many votes to skew the vibe) — needs a per-user **identity** to dedupe. **Firebase Anonymous Auth** mints a unique `uid` per install (no login UI), which makes per-user dedup *possible* (e.g. vote doc id = `uid` so re-votes overwrite). But it is a **deterrent, not a guarantee**: anonymous uids are cheap to reset (reinstall / clear data) or mint in bulk, so it only *raises the cost* of ballot-stuffing. Full Auth (Google/Apple) is much stronger (real accounts are costly to mass-create). True integrity is **layered**: identity (anonymous → full) + App Check (identities must come from the genuine app) + **server-side weighted/decay aggregation** so a few fake votes don't swing the displayed vibe.
+  Aggregation runs **server-side** (Cloud Function / scheduled job, Admin SDK) into the public summary — never in client logic (a forged client could write any summary). Pairs with the "Check-in trust model" item below. Identity is a pre-req for concern #3 only.
+
 ---
 
 ## 🟠 High Importance / Low Urgency
@@ -30,7 +36,9 @@
 
 - **Match info:** Display match info (e.g. dates, teams, live stats) on the main page or map page to give users soccer context alongside venue data.
 
-- **Fan zone expiry sweep:** Separate scheduled sweep that retires past events so the `venues` collection doesn't accumulate stale docs. Treat an event as complete when `end_time ?? (start_time + ~3h default window) < now`; after a grace period, deactivate (`is_active: false`) or delete it. Runs independently of the moderation sweep. `end_time` is optional and only sharpens the estimate.
+- **Fan zone expiry sweep:** Separate scheduled sweep that retires past events so the `venues` collection doesn't accumulate stale docs. Treat an event as complete when `end_time ?? (start_time + ~3h default window) < now`; after a grace period, deactivate (`is_active: false`) or delete it. Runs independently of the moderation sweep via the Admin SDK (bypasses rules; client deletes stay locked). `end_time` is optional and only sharpens the estimate.
+
+- **Venue/event deletion flow (user-initiated):** Let users delete their own fan zones/events from the UI. **Pre-req: Auth flow** — deletion must be owner-scoped (`allow delete: if request.auth != null && resource.data.created_by == request.auth.uid`), which requires a signed-in identity. Without auth there's no way to identify the owner, so client deletes can't be allowed safely (anyone could delete anything) — which is why the interim security rules lock client deletes entirely. Distinct from the background expiry/cleanup deletion, which runs via the Admin SDK and is not user-initiated.
 
 ---
 
