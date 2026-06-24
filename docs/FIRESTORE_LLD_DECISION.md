@@ -127,6 +127,36 @@ rules run**.
   (and, if ever needed, a rate-limited server proxy — currently **dropped** as not worth
   the cost).
 
+### Update — App Check deprioritized; invest in Auth instead
+
+After scoping the implementation, we are **deprioritizing App Check** and putting that
+effort into the **Authentication flow** instead. Reasoning:
+
+- **Mobile App Check is a heavy native-module lift.** Both apps use the **Firebase JS
+  SDK**. The JS SDK only ships **browser** attestation providers (reCAPTCHA), which can't
+  run in React Native (no DOM). Real mobile attestation (App Attest / Play Integrity)
+  needs **`@react-native-firebase/app-check`** — a native module → an **EAS rebuild**, a
+  **JS-SDK-vs-native token-bridging** problem (custom provider glue, or migrating all of
+  Firestore to react-native-firebase), plus extra native config files and console
+  attestation setup.
+- **Enforcement is all-or-nothing.** "Enforce App Check on Firestore" is a single
+  per-(project, product) switch covering **every** client. Turning it on while mobile
+  can't attest **locks the mobile app out of Firestore entirely**. So web-only App Check
+  must stay **unenforced (monitoring)** — which **blocks nothing**, i.e. no actual
+  protection. Web's *value* is therefore gated on the hard mobile work.
+- **Auth is the better investment.** Auth ≠ App Check (identity vs app attestation), but
+  requiring `request.auth != null` (esp. Google/Apple) on create makes script-spam
+  **costly** (an attacker needs real accounts), gives `request.auth.uid` for
+  **owner-scoped** rules + per-user accountability, and **unblocks the roadmap** (RSVP,
+  check-in trust model, venue deletion, host controls — all of which list auth as a
+  prerequisite).
+
+**Interim safeguards kept** (cheap, not wasted by the auth work, close the urgent hole
+now): **Admin SDK tooling** + **enforce `is_active == false` on create** — a rules-only
+change that makes any scripted create **invisible** on both platforms regardless of auth
+timing. **App Check remains later defense-in-depth** (possibly web-only reCAPTCHA
+eventually), not an immediate priority.
+
 ---
 
 ## 5. Client vs server trust boundary (Admin SDK)
@@ -185,8 +215,11 @@ and **most are not auth-dependent**:
 
 1. **Partial rules now, defer user auth.** Reads open; creates validated; update/delete
    locked; `live_statuses` writes locked; deny-all fallback.
-2. **App Check is the primary no-auth protection** — enforce on Firestore across web/iOS/
-   Android. Keep token TTL at the default **1 hour**.
+2. **App Check — DEPRIORITIZED (see §4 Update).** Mobile attestation is a heavy
+   native-module lift and enforcement is all-or-nothing, so web-only App Check gives no
+   real protection. We invest that effort in the **Auth flow** instead, and close the
+   urgent hole now with the interim safeguards below. App Check stays as later
+   defense-in-depth (default token TTL 1h if/when adopted).
 3. **Admin SDK for all privileged/background writes** — server-side only, key never in a
    client. Migrate seeding/cleanup; back the sweeps and future aggregation.
 4. **`live_statuses` / check-in stays disabled** until the trust model — then split into
