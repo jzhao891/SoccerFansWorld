@@ -1,4 +1,4 @@
-import { getAdminDb } from './lib/admin';
+import { getAdminDb } from '../lib/admin';
 import { WORLD_CUP_2026_TEAMS } from '@sfw/shared';
 
 /**
@@ -12,8 +12,8 @@ import { WORLD_CUP_2026_TEAMS } from '@sfw/shared';
  * It also performs the checks the Firestore rules *can't* (the rules language has no list
  * iteration) — notably per-team validation of `watching_teams`.
  *
- *   npx tsx backend/venue-activation-sweeper.ts            # dry run (report only, no writes)
- *   npx tsx backend/venue-activation-sweeper.ts --apply    # activate the passing docs
+ *   npx tsx backend/sweepers/venue-activation-sweeper.ts            # dry run (report only, no writes)
+ *   npx tsx backend/sweepers/venue-activation-sweeper.ts --apply    # activate the passing docs
  *
  * Uses the Admin SDK (bypasses security rules, which lock client updates).
  */
