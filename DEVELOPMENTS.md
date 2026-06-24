@@ -153,6 +153,22 @@ Install the resulting `.apk` on your Android device.
 
 ---
 
+## Deploy Firestore Security Rules
+
+Deploys `firestore.rules` (+ `firestore.indexes.json`) to the Firebase project in `.firebaserc` (`footballfansworld-d532e`). Run from repo root. Changes **production** access — review the diff and test a create in the Firebase Console **Rules Playground** before publishing.
+
+```bash
+# one-time, if not already authenticated
+npx firebase-tools login
+
+# deploy only the Firestore rules
+npx firebase-tools deploy --only firestore:rules
+```
+
+Look for `✔ cloud.firestore: rules file firestore.rules compiled successfully` and `✔ Deploy complete!`. See `docs/FIRESTORE_LLD_DECISION.md` for the rules design.
+
+---
+
 ## Seed Venues
 
 Populates Firestore `venues` from `packages/shared/src/scripts/venues.json` via Google Places API. Run from repo root.
