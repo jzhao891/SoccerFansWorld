@@ -220,7 +220,7 @@ RULES
 **Step 2 — Run**
 
 ```bash
-npx tsx backend/seed-venues.ts
+npx tsx backend/scripts/seed-venues.ts
 ```
 
 Env vars load from `apps/web/.env.local`. Output is logged to console and a timestamped file in `logs/`.
@@ -228,7 +228,7 @@ Env vars load from `apps/web/.env.local`. Output is logged to console and a time
 **Count seeded venues**
 
 ```bash
-npx tsx backend/count-venues.ts
+npx tsx backend/scripts/count-venues.ts
 ```
 
 Prints the total number of `venues` documents in Firestore, broken down by venue name.

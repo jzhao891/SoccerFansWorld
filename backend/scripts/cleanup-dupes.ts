@@ -1,4 +1,4 @@
-import { getAdminDb } from './lib/admin';
+import { getAdminDb } from '../lib/admin';
 
 // Admin SDK (bypasses security rules — client deletes are locked). Deletes duplicate
 // venue docs that share a venue_id + event_title, keeping the oldest by created_at.

@@ -5,10 +5,10 @@
   "description": "Server-side service: privileged data jobs (seed, cleanup, moderation/activation, expiry) run with the Firebase Admin SDK. NOT imported by any app — see docs/FIRESTORE_LLD_DECISION.md.",
   "scripts": {
     "test": "vitest run",
-    "seed": "tsx seed-venues.ts",
-    "count": "tsx count-venues.ts",
-    "cleanup-dupes": "tsx cleanup-dupes.ts",
-    "activation-sweep": "tsx venue-activation-sweeper.ts"
+    "seed": "tsx scripts/seed-venues.ts",
+    "count": "tsx scripts/count-venues.ts",
+    "cleanup-dupes": "tsx scripts/cleanup-dupes.ts",
+    "activation-sweep": "tsx sweepers/venue-activation-sweeper.ts"
   },
   "dependencies": {
     "@sfw/shared": "*",
