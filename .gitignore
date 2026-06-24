@@ -38,7 +38,12 @@ ONETIME_SETUP.md
 /logs/*.log
 
 # venue seed data (contains Google Places IDs — keep local only)
-packages/shared/src/scripts/resources/venues*.json
+backend/resources/venues*.json
+
+# Firebase Admin SDK service-account key — SECRET, NEVER commit
+serviceAccountKey.json
+*serviceAccount*.json
+*service-account*.json
 
 # typescript
 *.tsbuildinfo

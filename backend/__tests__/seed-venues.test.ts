@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import * as path from 'path';
 import * as fs from 'fs';
-import { validateVenues, findPotentialDuplicates, logDuplicateWarning, log } from '../../scripts/seed-venues';
-import type { SeedVenue, SeedEvent, FirestoreDoc } from '../../scripts/seed-venues';
+import { validateVenues, findPotentialDuplicates, logDuplicateWarning, log } from '../seed-venues';
+import type { SeedVenue, SeedEvent, FirestoreDoc } from '../seed-venues';
 
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn(),

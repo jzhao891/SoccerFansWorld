@@ -1,0 +1,24 @@
+{
+  "name": "@sfw/backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Server-side service: privileged data jobs (seed, cleanup, moderation/activation, expiry) run with the Firebase Admin SDK. NOT imported by any app — see docs/FIRESTORE_LLD_DECISION.md.",
+  "scripts": {
+    "test": "vitest run",
+    "seed": "tsx seed-venues.ts",
+    "count": "tsx count-venues.ts",
+    "cleanup-dupes": "tsx cleanup-dupes.ts",
+    "activation-sweep": "tsx venue-activation-sweeper.ts"
+  },
+  "dependencies": {
+    "@sfw/shared": "*",
+    "firebase": "^12.14.0",
+    "firebase-admin": "^14.0.0",
+    "geofire-common": "^6.0.0"
+  },
+  "devDependencies": {
+    "dotenv": "^17.4.2",
+    "tsx": "^4.22.4",
+    "vitest": "^4.1.9"
+  }
+}
