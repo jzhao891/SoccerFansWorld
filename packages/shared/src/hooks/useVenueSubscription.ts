@@ -38,6 +38,10 @@ export function useVenueSubscription() {
     const venueMap = new Map<string, FanZone>();
     const liveStatusCleanupByVenueId = new Map<string, () => void>();
 
+    // TODO: DEAD CODE — live-status check-in is disabled, so this subscription always
+    // reads empty. Firestore `live_statuses` reads are left open (harmless) and writes
+    // are locked. Re-enable this (and the drawer summary UI) when the Auth flow +
+    // check-in trust model land. See docs/FIRESTORE_LLD_DECISION.md.
     function subscribeToLiveStatus(venueId: string) {
       if (liveStatusCleanupByVenueId.has(venueId)) return;
       const unsub = onSnapshot(doc(db, LIVE_STATUSES_COLLECTION, venueId), (statusDoc) => {
@@ -59,7 +63,7 @@ export function useVenueSubscription() {
     for (const [start, end] of geohashBounds) {
       const q = query(
         collection(db, VENUES_COLLECTION),
-        where('is_active', '==', true),
+        where('activity_status', '==', 'ACTIVE'),
         orderBy('geohash'),
         where('geohash', '>=', start),
         where('geohash', '<=', end),

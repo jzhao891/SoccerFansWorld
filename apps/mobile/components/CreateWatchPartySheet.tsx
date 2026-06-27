@@ -229,7 +229,7 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
         amenities: [],
         ...(organizerList.length ? { organizers: organizerList } : {}),
         ...(url.trim() ? { url: url.trim() } : {}),
-        is_active: false, // created inactive; a moderation sweep validates + activates it (see BACKLOGS.md)
+        activity_status: 'INACTIVE', // created hidden; the activation sweep validates + activates it (see BACKLOGS.md)
         created_by: '',
         created_at: Date.now(),
       });

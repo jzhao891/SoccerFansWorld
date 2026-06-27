@@ -153,9 +153,33 @@ Install the resulting `.apk` on your Android device.
 
 ---
 
+## Deploy Firestore Rules & Indexes
+
+Deploys `firestore.rules` and `firestore.indexes.json` to the Firebase project in `.firebaserc` (`footballfansworld-d532e`). Run from repo root. Changes **production** — for rules, review the diff and test a create in the Firebase Console **Rules Playground** before publishing.
+
+```bash
+# one-time, if not already authenticated
+npx firebase-tools login
+
+# deploy only the Firestore rules
+npx firebase-tools deploy --only firestore:rules
+
+# deploy only the composite indexes (adds any new ones in firestore.indexes.json)
+npx firebase-tools deploy --only firestore:indexes
+```
+
+Look for `✔ cloud.firestore: rules file firestore.rules compiled successfully` and `✔ Deploy complete!`. See `docs/FIRESTORE_LLD_DECISION.md` for the rules design.
+
+**Indexes notes:**
+- Creating a new composite index triggers a backfill (Firestore scans existing docs to populate it) — the query that needs it errors until the build finishes. Adding a new equality+range query (e.g. on a new field) usually needs a matching composite index here.
+- Composite indexes created out-of-band via the Console (e.g. from a query's "create index" link) are **not** in `firestore.indexes.json` until added manually — keep them tracked so they're version-controlled.
+- **Pruning:** `npx firebase-tools deploy --only firestore:indexes --force` deletes any index in the project that is **not** in `firestore.indexes.json`. Confirm every still-used index is listed in the file first (run `npx firebase-tools firestore:indexes` to compare) — otherwise `--force` will delete a live index and its query will start failing. Deleting an index does not touch documents; only index creation reads them.
+
+---
+
 ## Seed Venues
 
-Populates Firestore `venues` from `packages/shared/src/scripts/venues.json` via Google Places API. Run from repo root.
+Populates Firestore `venues` from `backend/resources/venues3.json` via Google Places API. Run from repo root. (The `backend/` workspace is the server-side service — privileged data jobs run with the Admin SDK; it is never imported by any app. See `docs/FIRESTORE_LLD_DECISION.md`.)
 
 **Step 1 — Write `venues.json`**
 
@@ -204,7 +228,7 @@ RULES
 **Step 2 — Run**
 
 ```bash
-npx tsx packages/shared/src/scripts/seed-venues.ts
+npx tsx backend/scripts/seed-venues.ts
 ```
 
 Env vars load from `apps/web/.env.local`. Output is logged to console and a timestamped file in `logs/`.
@@ -212,7 +236,7 @@ Env vars load from `apps/web/.env.local`. Output is logged to console and a time
 **Count seeded venues**
 
 ```bash
-npx tsx packages/shared/src/scripts/count-venues.ts
+npx tsx backend/scripts/count-venues.ts
 ```
 
 Prints the total number of `venues` documents in Firestore, broken down by venue name.

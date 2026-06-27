@@ -1,0 +1,85 @@
+rules_version = '2';
+
+// FandarAI — Firestore security rules
+//
+// INTERIM ("partial") ruleset. Firebase Auth is not implemented yet, so we cannot
+// scope writes to an owner. See docs/FIRESTORE_LLD_DECISION.md for the full rationale.
+// Posture until Auth lands:
+//   - reads open (the map needs venues + the public live-status summary),
+//   - creates allowed but the document shape is VALIDATED (no garbage / oversized docs) AND
+//     forced to activity_status == 'INACTIVE' so clients can't self-publish — the Admin-SDK
+//     activation sweep is the only path to ACTIVE (seeding also writes ACTIVE via Admin SDK,
+//     which bypasses these rules),
+//   - updates + deletes DENIED from clients (privileged mutation goes through the Admin SDK),
+//   - live_statuses writes DENIED (check-in is disabled; re-open with Auth + trust model).
+//
+// TODO (once Auth lands): require request.auth != null on writes, enforce
+//   request.resource.data.created_by == request.auth.uid on create, and allow owner-scoped
+//   update/delete.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- Validation helpers ----
+
+    // Minimum required fields + type/enum/size checks for a FanZone doc on create.
+    // Extra fields are allowed; this only guarantees the core contract holds.
+    function isValidFanZone(d) {
+      return d.keys().hasAll([
+               'source', 'venue_id', 'name', 'address', 'location', 'geohash',
+               'event_title', 'admission', 'activity_status',
+               'created_by', 'created_at'
+             ])
+             && d.source in ['google', 'osm', 'custom']
+             && d.name is string && d.name.size() > 0 && d.name.size() <= 200
+             && d.address is string && d.address.size() <= 500
+             && d.event_title is string && d.event_title.size() > 0 && d.event_title.size() <= 300
+             && d.location.lat is number && d.location.lng is number
+             && d.geohash is string
+             && d.admission in ['free', 'paid']
+             && d.activity_status in ['ACTIVE', 'INACTIVE', 'REJECTED']
+             && d.created_by is string
+             && d.created_at is number
+             // venue_id is a string for google/osm, null for custom
+             && (d.venue_id == null || d.venue_id is string)
+             // optional fields — validated only when present.
+             // NOTE: the rules language has no list iteration, so we can only assert
+             // watching_teams/organizers are lists — per-element string/length checks
+             // must be enforced in the app frontend.
+             && (!('start_time' in d) || d.start_time is number)
+             && (!('end_time' in d) || d.end_time is number)
+             && (!('amenities' in d) || d.amenities is list)
+             && (!('watching_teams' in d) || d.watching_teams is list)
+             && (!('organizers' in d) || d.organizers is list)
+             && (!('url' in d) || (d.url is string && d.url.size() <= 2000))
+             && (!('description' in d) || (d.description is string && d.description.size() <= 2000));
+    }
+
+    // ---- Collections ----
+
+    // Fan zones / watch parties shown on the map.
+    match /venues/{venueId} {
+      allow read:           if true;
+      // Clients may only create hidden docs; the Admin-SDK activation sweep promotes to ACTIVE.
+      allow create:         if isValidFanZone(request.resource.data)
+                               && request.resource.data.activity_status == 'INACTIVE';
+      allow update, delete: if false; // locked until Auth (owner-scoped) + Admin-SDK tooling
+    }
+
+    // Live crowd/sound summary per physical venue. Check-in is disabled, so nothing
+    // writes this and the read path is currently dead (see the TODO in
+    // useVenueSubscription.ts). Read is left OPEN (harmless — returns empty) rather than
+    // ripping out the subscription; writes stay locked. Revisit with Auth + the trust
+    // model (public summary read; raw votes in a separate write-only `check_ins`
+    // collection; server-side aggregation).
+    match /live_statuses/{venueId} {
+      allow read:  if true;
+      allow write: if false;
+    }
+
+    // Everything else: deny by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
