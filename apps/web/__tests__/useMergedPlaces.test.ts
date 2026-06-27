@@ -28,7 +28,7 @@ const fanZoneBase: Omit<FanZone, 'id' | 'source' | 'venue_id'> = {
   start_time: 0,
   watching_teams: ['England'],
   amenities: [],
-  is_active: true,
+  activity_status: 'ACTIVE',
   created_by: 'user_1',
   created_at: 0,
 };
@@ -108,8 +108,8 @@ describe('useMergedPlaces', () => {
 
   it('excludes inactive events', () => {
     const events: FanZone[] = [
-      { ...fanZoneBase, id: 'e_active', source: 'custom', venue_id: null, is_active: true },
-      { ...fanZoneBase, id: 'e_inactive', source: 'custom', venue_id: null, is_active: false },
+      { ...fanZoneBase, id: 'e_active', source: 'custom', venue_id: null, activity_status: 'ACTIVE' },
+      { ...fanZoneBase, id: 'e_inactive', source: 'custom', venue_id: null, activity_status: 'INACTIVE' },
     ];
     useMapStore.setState({ places: [], fanZones: events });
     const { result } = renderHook(() => useMergedPlaces());

@@ -19,7 +19,7 @@ export function useMergedPlaces(): MergedPlace[] {
     const result: MergedPlace[] = [];
 
     // Only active events surface on the map / in the drawer.
-    const active = fanZones.filter((fz) => fz.is_active);
+    const active = fanZones.filter((fz) => fz.activity_status === 'ACTIVE');
 
     // Group events by physical venue: by venue_id when present, otherwise
     // each custom party (null venue_id) stands alone keyed by its own id.

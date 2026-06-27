@@ -1,17 +1,8 @@
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as path from 'path';
 import * as fs from 'fs';
 import { validateVenues, findPotentialDuplicates, logDuplicateWarning, log } from '../scripts/seed-venues';
 import type { SeedVenue, SeedEvent, FirestoreDoc } from '../scripts/seed-venues';
-
-vi.mock('firebase/firestore', () => ({
-  collection: vi.fn(),
-  query: vi.fn().mockReturnValue({}),
-  where: vi.fn().mockReturnValue({}),
-  addDoc: vi.fn(),
-  getDocs: vi.fn(),
-  getFirestore: vi.fn(),
-}));
 
 const makeEvent = (overrides: Partial<SeedEvent> = {}): SeedEvent => ({
   event_title: 'Belgium vs. Egypt',
@@ -121,58 +112,60 @@ describe('findPotentialDuplicates', () => {
     return { docs: docs.map((d) => ({ id: d.id, data: () => ({ ...d }) })) };
   }
 
+  // Mock Admin Firestore: db.collection('venues').where(...).where(...).where(...).get()
+  function makeDb(snap: ReturnType<typeof makeSnap>) {
+    const get = vi.fn().mockResolvedValue(snap);
+    const q: any = { where: vi.fn(() => q), get };
+    const db = { collection: vi.fn(() => q) } as any;
+    return { db, get };
+  }
+
   it('returns empty when no docs exist', async () => {
-    const { getDocs } = await import('firebase/firestore');
-    (getDocs as Mock).mockResolvedValue(makeSnap([]));
-    const result = await findPotentialDuplicates({} as any, 'place_123', START, ['Belgium', 'Egypt']);
+    const { db } = makeDb(makeSnap([]));
+    const result = await findPotentialDuplicates(db, 'place_123', START, ['Belgium', 'Egypt']);
     expect(result).toHaveLength(0);
   });
 
   it('flags when BOTH same-day AND overlapping teams match (intersection)', async () => {
-    const { getDocs } = await import('firebase/firestore');
     const existing: FirestoreDoc = {
       id: 'doc1', venue_id: 'place_123', start_time: START,
       event_title: 'BEL vs EGY', watching_teams: ['Belgium', 'Egypt'],
     };
-    (getDocs as Mock).mockResolvedValueOnce(makeSnap([existing]));
-    const result = await findPotentialDuplicates({} as any, 'place_123', START, ['Belgium', 'Egypt']);
+    const { db } = makeDb(makeSnap([existing]));
+    const result = await findPotentialDuplicates(db, 'place_123', START, ['Belgium', 'Egypt']);
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('doc1');
   });
 
   it('does not flag when same day but different teams', async () => {
-    const { getDocs } = await import('firebase/firestore');
     const existing: FirestoreDoc = {
       id: 'doc2', venue_id: 'place_123', start_time: START,
       event_title: 'USA vs Mexico', watching_teams: ['USA', 'Mexico'],
     };
-    (getDocs as Mock).mockResolvedValueOnce(makeSnap([existing]));
-    const result = await findPotentialDuplicates({} as any, 'place_123', START, ['Belgium', 'Egypt']);
+    const { db } = makeDb(makeSnap([existing]));
+    const result = await findPotentialDuplicates(db, 'place_123', START, ['Belgium', 'Egypt']);
     expect(result).toHaveLength(0);
   });
 
   it('does not flag when teams overlap but different day', async () => {
-    const { getDocs } = await import('firebase/firestore');
     // Day query returns nothing (different day), so intersection is empty
-    (getDocs as Mock).mockResolvedValueOnce(makeSnap([]));
-    const result = await findPotentialDuplicates({} as any, 'place_123', START, ['Belgium', 'Egypt']);
+    const { db } = makeDb(makeSnap([]));
+    const result = await findPotentialDuplicates(db, 'place_123', START, ['Belgium', 'Egypt']);
     expect(result).toHaveLength(0);
   });
 
   it('uses only day strategy when watching_teams is TBD', async () => {
-    const { getDocs } = await import('firebase/firestore');
     const existing: FirestoreDoc = { id: 'doc3', venue_id: 'place_123', start_time: START };
-    (getDocs as Mock).mockResolvedValueOnce(makeSnap([existing]));
-    const result = await findPotentialDuplicates({} as any, 'place_123', START, ['TBD']);
-    expect(getDocs).toHaveBeenCalledTimes(1);
+    const { db, get } = makeDb(makeSnap([existing]));
+    const result = await findPotentialDuplicates(db, 'place_123', START, ['TBD']);
+    expect(get).toHaveBeenCalledTimes(1);
     expect(result).toHaveLength(1);
   });
 
   it('uses only day strategy when watching_teams is absent', async () => {
-    const { getDocs } = await import('firebase/firestore');
-    (getDocs as Mock).mockResolvedValueOnce(makeSnap([]));
-    const result = await findPotentialDuplicates({} as any, 'place_123', START, undefined);
-    expect(getDocs).toHaveBeenCalledTimes(1);
+    const { db, get } = makeDb(makeSnap([]));
+    const result = await findPotentialDuplicates(db, 'place_123', START, undefined);
+    expect(get).toHaveBeenCalledTimes(1);
     expect(result).toHaveLength(0);
   });
 });

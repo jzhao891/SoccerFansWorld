@@ -63,7 +63,7 @@ export function useVenueSubscription() {
     for (const [start, end] of geohashBounds) {
       const q = query(
         collection(db, VENUES_COLLECTION),
-        where('is_active', '==', true),
+        where('activity_status', '==', 'ACTIVE'),
         orderBy('geohash'),
         where('geohash', '>=', start),
         where('geohash', '<=', end),

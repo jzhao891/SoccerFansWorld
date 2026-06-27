@@ -35,7 +35,7 @@ const mockFanZone: FanZone = {
   start_time: 0,
   watching_teams: ['England'],
   amenities: [],
-  is_active: true,
+  activity_status: 'ACTIVE',
   created_by: 'user_1',
   created_at: 0,
 };
