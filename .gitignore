@@ -49,6 +49,9 @@ serviceAccountKey.json
 *.tsbuildinfo
 .vercel
 .env*
+# ...but DO commit env templates (no secrets — just documents required vars)
+!.env.example
+!**/.env.example
 
 # claude local notes (machine-specific, never commit)
 CLAUDE.local.md

@@ -35,6 +35,10 @@ export type OsmVenue = {
 
 export type Venue = GoogleVenue | OsmVenue;
 
+// Moderation lifecycle of a FanZone. Replaces the old is_active boolean so we can tell
+// "awaiting review" (INACTIVE) apart from "reviewed and rejected" (REJECTED).
+export type ActivityStatus = 'ACTIVE' | 'INACTIVE' | 'REJECTED';
+
 // A custom fan zone stored in Firestore (venues collection)
 export type FanZone = {
   id: string;
@@ -58,7 +62,10 @@ export type FanZone = {
   description?: string;
   organizers?: string[];
   url?: string;
-  is_active: boolean;
+  // ACTIVE: passed validation + content review, shown on the map.
+  // INACTIVE: awaiting the activation sweep (default for user-created fan zones).
+  // REJECTED: failed the sweep's content gate — kept out of the sweep's re-scan.
+  activity_status: ActivityStatus;
   created_by: string;
   created_at: number;       // Unix timestamp ms
 };

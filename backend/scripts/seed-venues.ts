@@ -1,11 +1,16 @@
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import * as fs from 'fs';
-import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, addDoc, getDocs, query, where } from 'firebase/firestore';
+import type { Firestore } from 'firebase-admin/firestore';
 import { geohashForLocation } from 'geofire-common';
 import { WORLD_CUP_2026_TEAMS as KNOWN_TEAM_NAMES } from '@sfw/shared';
+import { getAdminDb } from '../lib/admin';
 
+// Seeding uses the Admin SDK, which bypasses security rules. The venues `create` rule limits
+// client writes to activity_status == 'INACTIVE'; curated seed venues are written ACTIVE,
+// which only the rule-exempt Admin SDK can do. Admin auth comes from serviceAccountKey.json
+// or GOOGLE_APPLICATION_CREDENTIALS (see lib/admin.ts); GOOGLE_PLACES_API_KEY still loads
+// from apps/web/.env.local.
 dotenv.config({ path: path.resolve(process.cwd(), 'apps/web/.env.local') });
 
 // ---- Logger (console + file) ----
@@ -116,7 +121,7 @@ export type FirestoreDoc = { id: string; [key: string]: any };
 // Returns docs that match BOTH strategies (same day AND overlapping teams).
 // If watching_teams is absent or TBD, only the day strategy is used.
 export async function findPotentialDuplicates(
-  db: ReturnType<typeof getFirestore>,
+  db: Firestore,
   venueId: string,
   startTimeMs: number,
   watchingTeams: string[] | undefined,
@@ -127,15 +132,13 @@ export async function findPotentialDuplicates(
   dayEnd.setHours(23, 59, 59, 999);
 
   // Strategy 3: same venue_id + same calendar day
-  const daySnap = await getDocs(
-    query(
-      collection(db, 'venues'),
-      where('venue_id', '==', venueId),
-      where('start_time', '>=', dayStart.getTime()),
-      where('start_time', '<=', dayEnd.getTime()),
-    ),
-  );
-  const byDay = daySnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const daySnap = await db
+    .collection('venues')
+    .where('venue_id', '==', venueId)
+    .where('start_time', '>=', dayStart.getTime())
+    .where('start_time', '<=', dayEnd.getTime())
+    .get();
+  const byDay: FirestoreDoc[] = daySnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
   // If no teams to check, day match alone is sufficient to flag
   const hasTeams = watchingTeams && watchingTeams.length > 0 && !watchingTeams.includes('TBD');
@@ -195,16 +198,8 @@ async function main() {
 
   log.info(`\nProceeding...\n`);
 
-  const app = initializeApp({
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  });
-  const db = getFirestore(app);
-  const venuesCol = collection(db, 'venues');
+  const db = getAdminDb();
+  const venuesCol = db.collection('venues');
 
   let created = 0;
   let skippedDedupe = 0;
@@ -255,12 +250,13 @@ async function main() {
         ...(event.description ? { description: event.description } : {}),
         ...(event.organizers ? { organizers: event.organizers } : {}),
         ...(event.url ? { url: event.url } : {}),
-        is_active: event.is_active ?? true,
+        // Seeded venues are curated, so they go straight to ACTIVE unless the input opts out.
+        activity_status: (event.is_active ?? true) ? 'ACTIVE' : 'INACTIVE',
         created_by: 'admin',
         created_at: Date.now(),
       };
 
-      await addDoc(venuesCol, doc);
+      await venuesCol.add(doc);
       log.info(`  + ${event.event_title}${event.start_time ? ` (${event.start_time})` : ''}`);
       created++;
     }
