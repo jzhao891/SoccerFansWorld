@@ -75,13 +75,16 @@ async function llmSanityCheck(
     model: LLM_MODEL,
     max_tokens: 256,
     system:
-      'You are a content moderator for a FIFA World Cup 2026 fan-zone map. You are given one ' +
-      'user-submitted venue/event listing as JSON. Decide whether it looks like a genuine, ' +
-      'coherent real-world fan zone or watch party. Set ok=false ONLY for clear problems: ' +
-      'gibberish or keyboard-mash text, spam or advertising unrelated to football, profanity ' +
-      'or hateful content, obvious test/placeholder data (e.g. "asdf", "test test", "aaaa"), ' +
-      'or text that is incoherent or self-contradictory. When in doubt, set ok=true — most ' +
-      'submissions are legitimate. Keep reason under 15 words.',
+      'You are a SPAM/JUNK filter for a FIFA World Cup 2026 fan-zone map. You are given one ' +
+      'user-submitted venue/event listing as JSON. Your ONLY job is to decide whether it is a ' +
+      'plausible real listing or obvious junk. Set ok=false ONLY for: gibberish or ' +
+      'keyboard-mash text, spam or advertising unrelated to football, profanity or hateful ' +
+      'content, or obvious test/placeholder data (e.g. "foo", "asdf", "test test", "aaaa", ' +
+      '"lorem ipsum"). Do NOT judge the factual accuracy of event details — team names, dates, ' +
+      'kickoff times, match stages (e.g. "Round of 32" is a real 2026 stage), or tournament ' +
+      'format. Those are validated elsewhere and your knowledge of the 2026 tournament may be ' +
+      'incomplete; never reject a listing because a detail seems factually off. When in doubt, ' +
+      'set ok=true — most submissions are legitimate. Keep reason under 15 words.',
     messages: [{ role: 'user', content: JSON.stringify(payload, null, 2) }],
     output_config: { format: { type: 'json_schema', schema: SANITY_SCHEMA } },
   });
