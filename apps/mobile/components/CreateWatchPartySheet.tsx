@@ -25,6 +25,14 @@ const SHEET_HEIGHT = Dimensions.get('window').height * 0.88;
 // "TBD" first so it leads the list and is the default for knockout/unknown matches.
 const TEAM_OPTIONS = ['TBD', ...WORLD_CUP_2026_TEAMS];
 
+// Common amenities offered as quick-add chips; the input also accepts free-form entries.
+const AMENITY_SUGGESTIONS = ['Big screen', 'Outdoor seating', 'Food', 'Drinks', 'Beer garden', 'Family friendly', 'Parking'];
+
+// Size caps. name/eventTitle/description/url mirror the Firestore rules (isValidFanZone) so the
+// client never submits a doc the rules would reject. amenity (per-entry length) + amenityCount
+// + organizers cover the per-element limits the rules language can't iterate.
+const LIMITS = { name: 200, eventTitle: 300, description: 2000, url: 2000, organizers: 300, amenity: 40, amenityCount: 20 };
+
 function defaultKickoff() {
   const d = new Date();
   d.setHours(d.getHours() + 1, 0, 0, 0);
@@ -80,6 +88,8 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
   const [selectedTeams, setSelectedTeams] = useState<string[]>(['TBD']);
   const [admission, setAdmission] = useState<'free' | 'paid'>('free');
   const [organizers, setOrganizers] = useState('');
+  const [amenities, setAmenities] = useState<string[]>([]);
+  const [amenityInput, setAmenityInput] = useState('');
   const [url, setUrl] = useState('');
   const [gpsLocation, setGpsLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
@@ -142,6 +152,21 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
     });
   }
 
+  function addAmenity(raw: string) {
+    const value = raw.trim().slice(0, LIMITS.amenity);
+    if (!value) return;
+    setAmenities((prev) =>
+      prev.length >= LIMITS.amenityCount || prev.some((a) => a.toLowerCase() === value.toLowerCase())
+        ? prev
+        : [...prev, value],
+    );
+    setAmenityInput('');
+  }
+
+  function removeAmenity(value: string) {
+    setAmenities((prev) => prev.filter((a) => a !== value));
+  }
+
   async function useGPS() {
     setGpsLoading(true);
     try {
@@ -200,6 +225,8 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
     setSelectedTeams(['TBD']);
     setAdmission('free');
     setOrganizers('');
+    setAmenities([]);
+    setAmenityInput('');
     setUrl('');
     setGpsLocation(null);
     setAddress(null);
@@ -226,7 +253,7 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
         // watching_teams present => watch party; omitted => Fan Zone only
         ...(isWatchParty ? { watching_teams: selectedTeams } : {}),
         admission,
-        amenities: [],
+        amenities,
         ...(organizerList.length ? { organizers: organizerList } : {}),
         ...(url.trim() ? { url: url.trim() } : {}),
         activity_status: 'INACTIVE', // created hidden; the activation sweep validates + activates it (see BACKLOGS.md)
@@ -266,6 +293,7 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
             placeholderTextColor={colors.textFaint}
             value={venueName}
             onChangeText={setVenueName}
+            maxLength={LIMITS.name}
             returnKeyType="next"
           />
 
@@ -277,6 +305,7 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
             placeholderTextColor={colors.textFaint}
             value={eventTitle}
             onChangeText={setEventTitle}
+            maxLength={LIMITS.eventTitle}
             returnKeyType="next"
           />
 
@@ -288,10 +317,12 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
             placeholderTextColor={colors.textFaint}
             value={description}
             onChangeText={setDescription}
+            maxLength={LIMITS.description}
             multiline
             numberOfLines={3}
             textAlignVertical="top"
           />
+          <Text style={styles.counter}>{description.length}/{LIMITS.description}</Text>
 
           {/* Start */}
           <Text style={styles.label}>Start <Text style={styles.required}>*</Text></Text>
@@ -444,6 +475,38 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
             })}
           </View>
 
+          {/* Amenities */}
+          <Text style={styles.label}>Amenities <Text style={styles.optional}>(optional)</Text></Text>
+          {amenities.length > 0 && (
+            <View style={styles.amenityRow}>
+              {amenities.map((a) => (
+                <TouchableOpacity key={a} style={styles.amenityChip} onPress={() => removeAmenity(a)}>
+                  <Text style={styles.amenityChipText}>{a}  ✕</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          <TextInput
+            style={styles.input}
+            placeholder="e.g. Big screen — type and add"
+            placeholderTextColor={colors.textFaint}
+            value={amenityInput}
+            onChangeText={setAmenityInput}
+            maxLength={LIMITS.amenity}
+            onSubmitEditing={() => addAmenity(amenityInput)}
+            blurOnSubmit={false}
+            returnKeyType="done"
+          />
+          <View style={styles.amenitySuggestions}>
+            {AMENITY_SUGGESTIONS.filter(
+              (s) => !amenities.some((a) => a.toLowerCase() === s.toLowerCase()),
+            ).map((s) => (
+              <TouchableOpacity key={s} style={styles.teamPill} onPress={() => addAmenity(s)}>
+                <Text style={styles.teamPillText}>+ {s}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
           {/* Organizers */}
           <Text style={styles.label}>Organizers <Text style={styles.optional}>(optional, comma-separated)</Text></Text>
           <TextInput
@@ -452,6 +515,7 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
             placeholderTextColor={colors.textFaint}
             value={organizers}
             onChangeText={setOrganizers}
+            maxLength={LIMITS.organizers}
             returnKeyType="next"
           />
 
@@ -463,6 +527,7 @@ export default function CreateWatchPartySheet({ visible, onClose, defaultLocatio
             placeholderTextColor={colors.textFaint}
             value={url}
             onChangeText={setUrl}
+            maxLength={LIMITS.url}
             autoCapitalize="none"
             keyboardType="url"
             returnKeyType="done"
@@ -547,6 +612,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   textArea: { minHeight: 80, paddingTop: 10 },
+  counter: { fontSize: 11, color: colors.textFaint, textAlign: 'right', marginTop: 2 },
   dateRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
   dateBtn: {
     flex: 1,
@@ -615,6 +681,15 @@ const styles = StyleSheet.create({
   teamPillActive: { backgroundColor: colors.black, borderColor: colors.black },
   teamPillText: { fontSize: 12, fontWeight: '500', color: colors.textSecondary },
   teamPillTextActive: { color: colors.white },
+  amenityRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.xs },
+  amenityChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+    backgroundColor: colors.black,
+  },
+  amenityChipText: { fontSize: 12, fontWeight: '500', color: colors.white },
+  amenitySuggestions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm },
   admissionRow: { flexDirection: 'row', gap: spacing.sm },
   admissionBtn: {
     flex: 1,
