@@ -19,6 +19,14 @@ interface Props {
 // "TBD" first so it leads the list and is the default for knockout/unknown matches.
 const TEAM_OPTIONS = ['TBD', ...WORLD_CUP_2026_TEAMS];
 
+// Common amenities offered as quick-add chips; the input also accepts free-form entries.
+const AMENITY_SUGGESTIONS = ['Big screen', 'Outdoor seating', 'Food', 'Drinks', 'Beer garden', 'Family friendly', 'Parking'];
+
+// Size caps. name/eventTitle/description/url mirror the Firestore rules (isValidFanZone) so the
+// client never submits a doc the rules would reject. amenity (per-entry length) + amenityCount
+// + organizers cover the per-element limits the rules language can't iterate.
+const LIMITS = { name: 200, eventTitle: 300, description: 2000, url: 2000, organizers: 300, amenity: 40, amenityCount: 20 };
+
 function defaultKickoffValue() {
   const d = new Date();
   d.setHours(d.getHours() + 1, 0, 0, 0);
@@ -37,6 +45,8 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
   const [selectedTeams, setSelectedTeams] = useState<string[]>(['TBD']);
   const [admission, setAdmission] = useState<'free' | 'paid'>('free');
   const [organizers, setOrganizers] = useState('');
+  const [amenities, setAmenities] = useState<string[]>([]);
+  const [amenityInput, setAmenityInput] = useState('');
   const [url, setUrl] = useState('');
   const [gpsLocation, setGpsLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
@@ -88,6 +98,21 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
     });
   }
 
+  function addAmenity(raw: string) {
+    const value = raw.trim().slice(0, LIMITS.amenity);
+    if (!value) return;
+    setAmenities((prev) =>
+      prev.length >= LIMITS.amenityCount || prev.some((a) => a.toLowerCase() === value.toLowerCase())
+        ? prev
+        : [...prev, value],
+    );
+    setAmenityInput('');
+  }
+
+  function removeAmenity(value: string) {
+    setAmenities((prev) => prev.filter((a) => a !== value));
+  }
+
   function useGPS() {
     setGpsLoading(true);
     navigator.geolocation.getCurrentPosition(
@@ -110,6 +135,8 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
     setSelectedTeams(['TBD']);
     setAdmission('free');
     setOrganizers('');
+    setAmenities([]);
+    setAmenityInput('');
     setUrl('');
     setGpsLocation(null);
     setAddress(null);
@@ -136,7 +163,7 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
         // watching_teams present => watch party; omitted => Fan Zone only
         ...(isWatchParty ? { watching_teams: selectedTeams } : {}),
         admission,
-        amenities: [],
+        amenities,
         ...(organizerList.length ? { organizers: organizerList } : {}),
         ...(url.trim() ? { url: url.trim() } : {}),
         activity_status: 'INACTIVE', // created hidden; the activation sweep validates + activates it (see BACKLOGS.md)
@@ -181,6 +208,7 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
             placeholder="e.g. World Cup 2026 Celebration Festival"
             value={venueName}
             onChange={(e) => setVenueName(e.target.value)}
+            maxLength={LIMITS.name}
             className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-800 outline-none focus:border-gray-400 bg-gray-50"
           />
         </div>
@@ -195,6 +223,7 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
             placeholder="e.g. USA vs England — Group Stage"
             value={eventTitle}
             onChange={(e) => setEventTitle(e.target.value)}
+            maxLength={LIMITS.eventTitle}
             className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-800 outline-none focus:border-gray-400 bg-gray-50"
           />
         </div>
@@ -208,9 +237,11 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
             placeholder="e.g. Meet here first, then we'll head somewhere together"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            maxLength={LIMITS.description}
             rows={3}
             className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-800 outline-none focus:border-gray-400 bg-gray-50 resize-none"
           />
+          <p className="text-xs text-gray-400 mt-1 text-right">{description.length}/{LIMITS.description}</p>
         </div>
 
         {/* Date & time */}
@@ -336,6 +367,61 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
           </div>
         </div>
 
+        {/* Amenities (optional) */}
+        <div className="mb-4">
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
+            Amenities <span className="font-normal normal-case text-gray-400">(optional)</span>
+          </label>
+          {amenities.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {amenities.map((a) => (
+                <span
+                  key={a}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-900 text-white"
+                >
+                  {a}
+                  <button
+                    type="button"
+                    onClick={() => removeAmenity(a)}
+                    aria-label={`Remove ${a}`}
+                    className="leading-none text-white/70 hover:text-white cursor-pointer"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <input
+            type="text"
+            placeholder="e.g. Big screen — type and press Enter"
+            value={amenityInput}
+            onChange={(e) => setAmenityInput(e.target.value)}
+            maxLength={LIMITS.amenity}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ',') {
+                e.preventDefault();
+                addAmenity(amenityInput);
+              }
+            }}
+            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-800 outline-none focus:border-gray-400 bg-gray-50"
+          />
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {AMENITY_SUGGESTIONS.filter(
+              (s) => !amenities.some((a) => a.toLowerCase() === s.toLowerCase()),
+            ).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => addAmenity(s)}
+                className="px-2.5 py-1 rounded-full text-xs font-medium border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 cursor-pointer"
+              >
+                + {s}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Organizers (optional) */}
         <div className="mb-4">
           <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
@@ -346,6 +432,7 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
             placeholder="e.g. Local Supporters Club, Pub Co"
             value={organizers}
             onChange={(e) => setOrganizers(e.target.value)}
+            maxLength={LIMITS.organizers}
             className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-800 outline-none focus:border-gray-400 bg-gray-50"
           />
         </div>
@@ -360,6 +447,7 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
             placeholder="https://…"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
+            maxLength={LIMITS.url}
             className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-800 outline-none focus:border-gray-400 bg-gray-50"
           />
         </div>
