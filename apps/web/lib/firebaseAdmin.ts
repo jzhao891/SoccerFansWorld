@@ -11,14 +11,20 @@ function adminApp(): App {
     _app = getApps()[0];
     return _app;
   }
-  _app = initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID!,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
-      // Vercel stores newlines as literal \n in env vars
-      privateKey: process.env.FIREBASE_PRIVATE_KEY!.replace(/\\n/g, "\n"),
-    }),
-  });
+  // Use explicit service account when vars are present (Vercel production).
+  // Falls back to Application Default Credentials for local dev
+  // (requires GOOGLE_APPLICATION_CREDENTIALS or gcloud auth ADC).
+  if (process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+    _app = initializeApp({
+      credential: cert({
+        projectId: process.env.FIREBASE_PROJECT_ID!,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+      }),
+    });
+  } else {
+    _app = initializeApp({ projectId: process.env.FIREBASE_PROJECT_ID });
+  }
   return _app;
 }
 

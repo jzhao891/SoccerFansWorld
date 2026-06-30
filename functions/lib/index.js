@@ -35,13 +35,9 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.dispatchFalJob = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
-const params_1 = require("firebase-functions/params");
 const admin = __importStar(require("firebase-admin"));
 const client_1 = require("@fal-ai/client");
 admin.initializeApp();
-const FAL_KEY = (0, params_1.defineString)("FAL_KEY");
-const WEBHOOK_BASE_URL = (0, params_1.defineString)("WEBHOOK_BASE_URL"); // e.g. https://fandar.ai
-const FAL_WEBHOOK_SECRET = (0, params_1.defineString)("FAL_WEBHOOK_SECRET");
 exports.dispatchFalJob = (0, firestore_1.onDocumentCreated)({ document: "jobs/{jobId}", timeoutSeconds: 10 }, async (event) => {
     const snap = event.data;
     if (!snap)
@@ -50,9 +46,9 @@ exports.dispatchFalJob = (0, firestore_1.onDocumentCreated)({ document: "jobs/{j
     // Guard: only process docs created in pending state
     if (job.status !== "pending")
         return;
-    client_1.fal.config({ credentials: FAL_KEY.value() });
-    const webhookUrl = `${WEBHOOK_BASE_URL.value()}/api/fal-webhook` +
-        `?secret=${FAL_WEBHOOK_SECRET.value()}`;
+    client_1.fal.config({ credentials: process.env.FAL_KEY });
+    const webhookUrl = `${process.env.WEBHOOK_BASE_URL}/api/fal-webhook` +
+        `?secret=${process.env.FAL_WEBHOOK_SECRET}`;
     const { request_id } = await client_1.fal.queue.submit(job.endpoint, {
         input: job.input,
         webhookUrl,
