@@ -135,6 +135,99 @@ Wrap children with `<AuthProvider>` so `onAuthStateChanged` runs once at the app
 
 ---
 
+## Mobile Implementation (Firebase) — Expo
+
+Mobile **reuses everything platform-agnostic**: the `AuthUser` type, the Zustand `currentUser`,
+the `onAuthStateChanged → AuthUser → store` pattern, the lazy-auth UX, and `created_by = uid`.
+What differs is **how a provider credential is obtained** — `signInWithPopup` does not exist in
+React Native, so each social provider uses a **native** flow that yields a credential, which is
+then handed to Firebase via **`signInWithCredential`**.
+
+> Since the app already runs as a custom Expo **dev client** (Mapbox's `@rnmapbox/maps` requires
+> it, so Expo Go was never an option), the native Google/Apple sign-in modules add **no new
+> constraint** — they compile into the same build. The code snippets below show the **approach
+> only**; confirm exact APIs against the **Expo SDK 56 docs** when implementing (per
+> `apps/mobile/AGENTS.md`).
+
+### Provider matrix (mobile)
+
+| Provider | iOS | Android | Native flow |
+|---|---|---|---|
+| Google | ✅ | ✅ | `@react-native-google-signin/google-signin` → `idToken` → `signInWithCredential` |
+| Apple | ✅ | ❌ | `expo-apple-authentication` → identity token + nonce → `signInWithCredential` |
+| Email / Password | ✅ | ✅ | `firebase/auth` directly (same calls as web) |
+
+Apple is **iOS-only** — hide the Apple button on Android.
+
+### Firebase init difference — React Native persistence (`apps/mobile/lib/firebase.ts`)
+
+Web's `getAuth(app)` uses browser persistence (IndexedDB), which RN doesn't have — so the session
+must persist via AsyncStorage, or the user is signed out on every relaunch:
+
+```ts
+import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+export const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage),
+});
+// (import path for getReactNativePersistence varies by firebase version — verify)
+```
+
+### Auth lib (`apps/mobile/lib/auth.ts`)
+
+Same function surface as web (`signInWithGoogle/Apple/Email`, `signUpWithEmail`, `signOut`); the
+Google/Apple bodies use native flows then `signInWithCredential`:
+
+```ts
+// Google — native sheet → idToken → Firebase credential
+// GoogleSignin.configure({ webClientId }) once at startup (webClientId = Firebase Web client ID)
+const { idToken } = await GoogleSignin.signIn();
+await signInWithCredential(auth, GoogleAuthProvider.credential(idToken));
+
+// Apple (iOS) — random rawNonce; pass SHA-256(rawNonce) to Apple, rawNonce to Firebase
+const cred = await AppleAuthentication.signInAsync({ requestedScopes: [...], nonce: hashedNonce });
+const provider = new OAuthProvider('apple.com');
+await signInWithCredential(auth, provider.credential({ idToken: cred.identityToken, rawNonce }));
+```
+
+Email/Password is identical to web (the JS SDK calls work unchanged in RN).
+
+### Reused from web (no change)
+
+- **Auth listener**: an `onAuthStateChanged(auth, …)` effect mapping `FirebaseUser → AuthUser → setCurrentUser`, mounted once at the app root (wrapping the root layout / navigator). Same store + same `AuthUser` from `@sfw/shared`.
+- **Gating + `created_by`**: the create flow checks `currentUser`, opens the sign-in sheet with a resume callback (exactly like web), and writes `created_by = currentUser.uid` in `apps/mobile/components/CreateWatchPartySheet.tsx` (currently `''`).
+
+### Components (`apps/mobile/components`)
+
+RN versions of the three web components, built with the mobile design system (`StyleSheet` +
+the existing bottom-sheet `Animated` pattern from `CreateWatchPartySheet`):
+
+| Component | Responsibility |
+|---|---|
+| auth listener (hook or `AuthGate`) | `onAuthStateChanged` → store |
+| `SignInSheet.tsx` | Bottom sheet: Google + Apple (iOS only) + Email/Password; `onSuccess` resume |
+| `ProfileSheet.tsx` | Name / email / sign out |
+| `ProfileAvatar.tsx` | Top-bar avatar; routes to the correct sheet |
+
+### One-time native + console setup (prereqs)
+
+| Task | Where |
+|---|---|
+| Enable Email/Password + Google + Apple providers | Firebase Console → Auth → Sign-in method (**shared with web**) |
+| Google: iOS + Android OAuth client IDs; `GoogleService-Info.plist` / `google-services.json` | Firebase Console → Project settings; wired via `app.config.ts` + EAS secrets |
+| Google: `webClientId` for `GoogleSignin.configure` | Firebase Console → Auth → Google provider (Web client ID) |
+| Apple: "Sign in with Apple" capability/entitlement | `app.config.ts` (expo-apple-authentication) + Apple Developer App ID/Service ID — **blocked on the iOS App ID registration (see backlog)** |
+| Native deps (require an EAS dev-client rebuild) | `@react-native-google-signin/google-signin`, `expo-apple-authentication`, `@react-native-async-storage/async-storage` |
+
+### Sequencing note
+
+Once mobile also sends authenticated creates (`created_by = uid`), the deferred **venue
+create-auth enforcement** (`request.auth != null && created_by == request.auth.uid`) can finally
+be enabled in `firestore.rules` for both platforms.
+
+---
+
 ## Appendix — Future Platform Architecture (Supabase + `@fandar/auth-engine`) — DEFERRED
 
 > **Status: NOT the current implementation.** This design targets a future Fandar *platform* with a custom backend API, portable identity, and multi-app auth (e.g. Instagram publishing). It is preserved here for that phase. The active app uses Firebase Auth (above); adopting this would require building a backend tier and bridging or replacing Firestore-direct data access.
