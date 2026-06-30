@@ -35,6 +35,7 @@ function defaultKickoffValue() {
 
 export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation, defaultSource, defaultVenueId, defaultAddress }: Props) {
   const viewState = useMapStore((s) => s.viewState);
+  const currentUser = useMapStore((s) => s.currentUser);
 
   const [venueName, setVenueName] = useState('');
   const [eventTitle, setEventTitle] = useState('');
@@ -167,7 +168,7 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
         ...(organizerList.length ? { organizers: organizerList } : {}),
         ...(url.trim() ? { url: url.trim() } : {}),
         activity_status: 'INACTIVE', // created hidden; the activation sweep validates + activates it (see BACKLOGS.md)
-        created_by: '',
+        created_by: currentUser?.uid ?? '', // create is gated behind sign-in (app/page.tsx), so uid is set
         created_at: Date.now(),
       });
       resetAndClose();

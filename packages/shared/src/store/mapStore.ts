@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { BoundingBox, FanZone, LatLng, LiveStatus, OsmVenue, Venue } from '../types/map';
+import type { AuthUser } from '../types/auth';
 
 // ~15 km in degrees latitude — used for distance-based cache eviction
 const EVICT_RADIUS_DEG = 0.135;
@@ -51,6 +52,10 @@ interface MapState {
   setSelectedTeam: (team: string | null) => void;
   setFlyToTarget: (target: FlyToTarget | null) => void;
   setIsFetchingPlaces: (value: boolean) => void;
+
+  // Auth — set by each app's AuthProvider via onAuthStateChanged; null when signed out.
+  currentUser: AuthUser | null;
+  setCurrentUser: (user: AuthUser | null) => void;
 }
 
 export const useMapStore = create<MapState>((set) => ({
@@ -100,4 +105,7 @@ export const useMapStore = create<MapState>((set) => ({
   setSelectedTeam: (team) => set({ selectedTeam: team }),
   setFlyToTarget: (target) => set({ flyToTarget: target }),
   setIsFetchingPlaces: (value) => set({ isFetchingPlaces: value }),
+
+  currentUser: null,
+  setCurrentUser: (user) => set({ currentUser: user }),
 }));

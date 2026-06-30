@@ -1,5 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { initializeFirestore, persistentLocalCache } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import { setDb } from '@sfw/shared';
 
 const firebaseConfig = {
@@ -16,3 +17,7 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0
 
 export const db = initializeFirestore(app, { localCache: persistentLocalCache() });
 setDb(db);
+
+// Firebase Auth. Default web persistence is browserLocalPersistence (IndexedDB), so the
+// session survives reloads/relaunches — see AUTH_HLD §4.
+export const auth = getAuth(app);

@@ -1,4 +1,5 @@
 export * from './types/map';
+export * from './types/auth';
 export * from './types/api';
 export * from './types/frame';
 export * from './constants';

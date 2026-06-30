@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Marker } from 'react-map-gl/mapbox';
@@ -10,6 +10,9 @@ import MapTopBar from '@/components/MapTopBar';
 import MapStatusOverlay from '@/components/MapStatusOverlay';
 import CreateWatchPartySheet from '@/components/CreateWatchPartySheet';
 import MapContextMenu from '@/components/MapContextMenu';
+import ProfileAvatar from '@/components/ProfileAvatar';
+import SignInSheet from '@/components/SignInSheet';
+import ProfileSheet from '@/components/ProfileSheet';
 import { useMapStore } from '@/store/mapStore';
 import { useVenueSubscription } from '@/hooks/useVenueSubscription';
 import { usePlacesSearch } from '@/hooks/usePlacesSearch';
@@ -20,6 +23,7 @@ const MapView = dynamic(() => import('@/components/MapView'), { ssr: false });
 
 export default function MapPage() {
   const setBounds = useMapStore((s) => s.setBounds);
+  const currentUser = useMapStore((s) => s.currentUser);
   const selectedPlaceId = useMapStore((s) => s.selectedPlaceId);
   const setSelectedOsmVenue = useMapStore((s) => s.setSelectedOsmVenue);
   const setSelectedPlaceId = useMapStore((s) => s.setSelectedPlaceId);
@@ -37,6 +41,16 @@ export default function MapPage() {
   const [sheetAddress, setSheetAddress] = useState<string | undefined>(undefined);
 
   const [createSheetOpen, setCreateSheetOpen] = useState(false);
+
+  // Auth UI. openSignIn stashes an optional onSuccess to resume a pending action (used by the
+  // create-party gate, #31); the avatar opens it with no resume.
+  const [signInOpen, setSignInOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const pendingResume = useRef<(() => void) | null>(null);
+  const openSignIn = useCallback((onSuccess?: () => void) => {
+    pendingResume.current = onSuccess ?? null;
+    setSignInOpen(true);
+  }, []);
 
   useVenueSubscription();
   usePlacesSearch();
@@ -69,6 +83,12 @@ export default function MapPage() {
     venue_id: string | null = null,
     address?: string,
   ) {
+    // Gate: creating a fan zone requires sign-in. Stash this exact call and resume it
+    // after the user signs in (the SignInSheet calls onSuccess on success).
+    if (!currentUser) {
+      openSignIn(() => handleCreateParty(location, source, venue_id, address));
+      return;
+    }
     setSheetDefaultLocation(location ?? mapPin?.location);
     setSheetSource(source);
     setSheetVenueId(venue_id);
@@ -80,6 +100,7 @@ export default function MapPage() {
   return (
     <main className="w-screen h-screen relative bg-gray-200">
       <MapTopBar />
+      <ProfileAvatar onRequestAuth={() => openSignIn()} onOpenProfile={() => setProfileOpen(true)} />
       <MapView onBoundsChange={handleBoundsChange} onMapClick={handleMapClick}>
         <MapMarkers />
 
@@ -113,6 +134,13 @@ export default function MapPage() {
         onClose={() => setCreateSheetOpen(false)}
       />
       <VenueDrawer onCreateParty={(loc, src, vid, addr) => handleCreateParty(loc, src, vid, addr)} />
+
+      <SignInSheet
+        isOpen={signInOpen}
+        onClose={() => setSignInOpen(false)}
+        onSuccess={() => { pendingResume.current?.(); pendingResume.current = null; }}
+      />
+      <ProfileSheet isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
 
       {/* Studio FAB — disabled for now */}
       <Link
