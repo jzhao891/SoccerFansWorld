@@ -3,6 +3,7 @@ import {
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   signOut as firebaseSignOut,
 } from 'firebase/auth';
 import { auth } from './firebase';
@@ -24,6 +25,11 @@ export function signInWithEmail(email: string, password: string) {
 // onAuthStateChanged path then signs the user in.
 export function signUpWithEmail(email: string, password: string) {
   return createUserWithEmailAndPassword(auth, email, password);
+}
+
+// Sends a Firebase password-reset email (uses the Auth email template configured in the console).
+export function sendPasswordReset(email: string) {
+  return sendPasswordResetEmail(auth, email);
 }
 
 export function signOut() {
