@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { signInWithGoogle, signInWithApple, signInWithEmail, signUpWithEmail } from '@/lib/auth';
+import { signInWithGoogle, signInWithEmail, signUpWithEmail } from '@/lib/auth';
 
 // Maps Firebase auth error codes to friendly messages.
 function prettyError(e: unknown): string {
@@ -95,16 +95,9 @@ export default function SignInSheet({
           <button
             onClick={() => void run(signInWithGoogle)}
             disabled={busy}
-            className="w-full mb-2 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer disabled:opacity-50"
-          >
-            Continue with Google
-          </button>
-          <button
-            onClick={() => void run(signInWithApple)}
-            disabled={busy}
             className="w-full py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer disabled:opacity-50"
           >
-            Continue with Apple
+            Continue with Google
           </button>
 
           <div className="flex items-center gap-3 my-4">

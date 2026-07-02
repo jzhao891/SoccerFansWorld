@@ -65,17 +65,19 @@ The map and discovery experience are fully open to unauthenticated users.
 | Component | Responsibility |
 |---|---|
 | `AuthProvider.tsx` | Client component wrapping the layout; runs `onAuthStateChanged` on mount, maps `FirebaseUser → AuthUser`, writes to Zustand |
-| `AuthSheet.tsx` | Bottom sheet with Google, Apple, Email/Password options; accepts `onSuccess?: () => void` callback to resume pending action after sign-in |
-| `ProfileAvatar.tsx` | Always visible in top bar; signed-out → opens `AuthSheet`; signed-in → shows photo or initials, opens `ProfileSheet` |
+| `SignInSheet.tsx` | Modal with Google + Email/Password (sign-in + sign-up); accepts `onSuccess?: () => void` to resume a pending action after sign-in. Apple is NOT offered on web — see below. |
+| `ProfileAvatar.tsx` | Always visible in top bar; signed-out → opens `SignInSheet`; signed-in → shows photo or initials, opens `ProfileSheet` |
 | `ProfileSheet.tsx` | Mini bottom sheet: display name, email, sign-out button |
 
 ### Auth Lib (`apps/web/lib/auth.ts`)
 
 Single file for all Firebase Auth calls:
 - `signInWithGoogle()` — `signInWithPopup` + `GoogleAuthProvider`
-- `signInWithApple()` — `signInWithPopup` + `OAuthProvider('apple.com')`
 - `signInWithEmail(email, password)` — `signInWithEmailAndPassword`
+- `signUpWithEmail(email, password)` — `createUserWithEmailAndPassword`
 - `signOut()` — `signOut(auth)`
+
+Web offers **Google + Email/Password only**. **Apple Sign-In is not offered on web** — it's optional there and needs Apple Developer setup. Apple ships on **iOS only**, where App Store Guideline 4.8 makes it mandatory alongside Google (see the Mobile section).
 
 ### Shared Data Model (`packages/shared`)
 
