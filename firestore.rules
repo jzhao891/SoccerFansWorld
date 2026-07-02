@@ -2,16 +2,19 @@ rules_version = '2';
 
 // FandarAI — Firestore security rules
 //
-// INTERIM ("partial") ruleset. Firebase Auth is not implemented yet, so we cannot
-// scope writes to an owner. See docs/FIRESTORE_LLD_DECISION.md for the full rationale.
-// Posture until Auth lands:
-//   - reads open (the map needs venues + the public live-status summary),
-//   - creates allowed but the document shape is VALIDATED (no garbage / oversized docs) AND
-//     forced to activity_status == 'INACTIVE' so clients can't self-publish — the Admin-SDK
-//     activation sweep is the only path to ACTIVE (seeding also writes ACTIVE via Admin SDK,
-//     which bypasses these rules),
+// INTERIM ("partial") ruleset. Firebase Auth is being introduced (web first). See
+// docs/FIRESTORE_LLD_DECISION.md for the full rationale.
+// Posture:
+//   - reads OPEN to everyone (the map needs venues + the public live-status summary) — unchanged,
+//   - venue CREATE is allowed without sign-in for now: shape is VALIDATED (no garbage / oversized
+//     docs) AND forced to activity_status == 'INACTIVE' so clients can't self-publish — the
+//     Admin-SDK activation sweep is the only path to ACTIVE (seeding also writes ACTIVE via Admin
+//     SDK, which bypasses these rules). Requiring sign-in on create (request.auth != null &&
+//     created_by == request.auth.uid) is DEFERRED until mobile also has auth — else mobile creates
+//     (no auth yet) would break,
 //   - updates + deletes DENIED from clients (privileged mutation goes through the Admin SDK),
-//   - live_statuses writes DENIED (check-in is disabled; re-open with Auth + trust model).
+//   - live_statuses writes DENIED (check-in is disabled; re-open with Auth + trust model),
+//   - users/{uid} (per-user metadata) OWNER-SCOPED via request.auth — the first auth-gated rule.
 //
 // TODO (once Auth lands): require request.auth != null on writes, enforce
 //   request.resource.data.created_by == request.auth.uid on create, and allow owner-scoped
@@ -75,6 +78,13 @@ service cloud.firestore {
     match /live_statuses/{venueId} {
       allow read:  if true;
       allow write: if false;
+    }
+
+    // Per-user app metadata (e.g. checkin_count). Owner-scoped: a user reads/writes ONLY their
+    // own doc, keyed by uid — the first rule that uses request.auth. The write (increment) is
+    // wired when check-in is re-enabled; the doc is created lazily on first write.
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
     // Everything else: deny by default.
