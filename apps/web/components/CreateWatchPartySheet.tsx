@@ -244,7 +244,7 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
         </div>
         {isEditMode && (
           <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 mb-4">
-            After saving, your fan zone will be hidden while it's reviewed. It'll reappear on the map once approved.
+            After saving, your fan zone will be hidden while it&apos;s reviewed. It&apos;ll reappear on the map once approved.
           </p>
         )}
 
