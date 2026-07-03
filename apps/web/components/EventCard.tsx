@@ -35,9 +35,11 @@ function formatStart(ms?: number): string {
 export default function EventCard({
   fz,
   onRequireSignIn,
+  onEdit,
 }: {
   fz: FanZone;
   onRequireSignIn: (onSuccess?: () => void) => void;
+  onEdit?: () => void;
 }) {
   const { myCheckin, hasRsvped, rsvpCount } = useVenueCheckins(fz.id, fz.start_time ?? null);
   const watchParty = isWatchParty(fz);
@@ -202,6 +204,12 @@ export default function EventCard({
             <button onClick={clearCheckin}
               className="ml-1 text-[10px] text-gray-400 hover:text-gray-600 underline cursor-pointer">
               Clear my check-in
+            </button>
+          )}
+          {onEdit && (
+            <button onClick={onEdit}
+              className="ml-auto text-[10px] text-gray-400 hover:text-gray-600 underline cursor-pointer">
+              Edit event
             </button>
           )}
         </div>

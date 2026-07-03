@@ -5,15 +5,19 @@ import { collection, doc, setDoc } from 'firebase/firestore';
 import { geohashForLocation } from 'geofire-common';
 import { db } from '@/lib/firebase';
 import { useMapStore } from '@/store/mapStore';
-import { WORLD_CUP_2026_TEAMS } from '@sfw/shared';
+import { WORLD_CUP_2026_TEAMS, updateVenue } from '@sfw/shared';
+import type { FanZone } from '@sfw/shared';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  // Create mode
   defaultLocation?: { lat: number; lng: number };
   defaultSource?: 'google' | 'osm' | 'custom';
   defaultVenueId?: string | null;
-  defaultAddress?: string; // already-known address (google / existing fan zone); osm & custom geocode instead
+  defaultAddress?: string;
+  // Edit mode — when set, pre-fills fields and calls updateVenue on submit
+  editingVenue?: FanZone | null;
 }
 
 // "TBD" first so it leads the list and is the default for knockout/unknown matches.
@@ -33,7 +37,8 @@ function defaultKickoffValue() {
   return d.toISOString().slice(0, 16);
 }
 
-export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation, defaultSource, defaultVenueId, defaultAddress }: Props) {
+export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation, defaultSource, defaultVenueId, defaultAddress, editingVenue }: Props) {
+  const isEditMode = !!editingVenue;
   const viewState = useMapStore((s) => s.viewState);
   const currentUser = useMapStore((s) => s.currentUser);
 
@@ -54,6 +59,23 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
   const [address, setAddress] = useState<string | null>(null);
   const [addressLoading, setAddressLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Pre-fill state when opening in edit mode.
+  useEffect(() => {
+    if (!editingVenue) return;
+    setVenueName(editingVenue.name);
+    setEventTitle(editingVenue.event_title);
+    setDescription(editingVenue.description ?? '');
+    setKickoffTime(editingVenue.start_time ? new Date(editingVenue.start_time).toISOString().slice(0, 16) : defaultKickoffValue());
+    setEndTime(editingVenue.end_time ? new Date(editingVenue.end_time).toISOString().slice(0, 16) : '');
+    const hasTeams = Array.isArray(editingVenue.watching_teams) && editingVenue.watching_teams.length > 0;
+    setIsWatchParty(hasTeams);
+    setSelectedTeams(hasTeams ? editingVenue.watching_teams! : ['TBD']);
+    setAdmission(editingVenue.admission ?? 'free');
+    setOrganizers(editingVenue.organizers?.join(', ') ?? '');
+    setAmenities(editingVenue.amenities ?? []);
+    setUrl(editingVenue.url ?? '');
+  }, [editingVenue]);
 
   const meetingPoint = gpsLocation ?? defaultLocation ?? { lat: viewState.latitude, lng: viewState.longitude };
 
@@ -145,34 +167,53 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
   }
 
   async function handleSubmit() {
-    // Sign-in is gated upstream (app/page.tsx), but guard here too: the rules require
-    // created_by == request.auth.uid, so a signed-out submit would be rejected anyway.
-    if (!canSubmit || !currentUser) return;
+    if (!canSubmit) return;
     setSaving(true);
     try {
       const organizerList = organizers.split(',').map((o) => o.trim()).filter(Boolean);
-      const ref = doc(collection(db, 'venues'));
-      await setDoc(ref, {
-        source: defaultSource ?? 'custom',
-        venue_id: defaultVenueId ?? null,
-        name: venueName.trim(),
-        event_title: eventTitle.trim(),
-        ...(description.trim() ? { description: description.trim() } : {}),
-        location: meetingPoint,
-        address: address ?? `${meetingPoint.lat.toFixed(5)}, ${meetingPoint.lng.toFixed(5)}`,
-        geohash: geohashForLocation([meetingPoint.lat, meetingPoint.lng]),
-        start_time: new Date(kickoffTime).getTime(),
-        ...(endTime ? { end_time: new Date(endTime).getTime() } : {}),
-        // watching_teams present => watch party; omitted => Fan Zone only
-        ...(isWatchParty ? { watching_teams: selectedTeams } : {}),
-        admission,
-        amenities,
-        ...(organizerList.length ? { organizers: organizerList } : {}),
-        ...(url.trim() ? { url: url.trim() } : {}),
-        activity_status: 'INACTIVE', // created hidden; the activation sweep validates + activates it (see BACKLOGS.md)
-        created_by: currentUser.uid, // guarded above; rules require created_by == auth.uid
-        created_at: Date.now(),
-      });
+
+      if (isEditMode) {
+        const rawPatch = {
+          name: venueName.trim(),
+          event_title: eventTitle.trim(),
+          description: description.trim() || undefined,
+          start_time: new Date(kickoffTime).getTime(),
+          end_time: endTime ? new Date(endTime).getTime() : undefined,
+          watching_teams: isWatchParty ? selectedTeams : [],
+          admission,
+          amenities,
+          organizers: organizerList.length ? organizerList : undefined,
+          url: url.trim() || undefined,
+        };
+        const patch = Object.fromEntries(
+          Object.entries(rawPatch).filter(([, v]) => v !== undefined)
+        ) as Parameters<typeof updateVenue>[1];
+        await updateVenue(editingVenue!.id, patch);
+      } else {
+        // Sign-in is gated upstream (app/page.tsx), but guard here too.
+        if (!currentUser) return;
+        const ref = doc(collection(db, 'venues'));
+        await setDoc(ref, {
+          source: defaultSource ?? 'custom',
+          venue_id: defaultVenueId ?? null,
+          name: venueName.trim(),
+          event_title: eventTitle.trim(),
+          ...(description.trim() ? { description: description.trim() } : {}),
+          location: meetingPoint,
+          address: address ?? `${meetingPoint.lat.toFixed(5)}, ${meetingPoint.lng.toFixed(5)}`,
+          geohash: geohashForLocation([meetingPoint.lat, meetingPoint.lng]),
+          start_time: new Date(kickoffTime).getTime(),
+          ...(endTime ? { end_time: new Date(endTime).getTime() } : {}),
+          ...(isWatchParty ? { watching_teams: selectedTeams } : {}),
+          admission,
+          amenities,
+          ...(organizerList.length ? { organizers: organizerList } : {}),
+          ...(url.trim() ? { url: url.trim() } : {}),
+          activity_status: 'INACTIVE',
+          created_by: currentUser.uid,
+          created_at: Date.now(),
+        });
+      }
       resetAndClose();
     } finally {
       setSaving(false);
@@ -180,8 +221,9 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
   }
 
   const canSubmit = Boolean(
-    currentUser && venueName.trim() && eventTitle.trim() && kickoffTime &&
-    (!isWatchParty || selectedTeams.length > 0),
+    venueName.trim() && eventTitle.trim() && kickoffTime &&
+    (!isWatchParty || selectedTeams.length > 0) &&
+    (isEditMode || currentUser),
   );
 
   return (
@@ -196,10 +238,15 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
         }`}
       >
         <div className="p-5">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-bold text-gray-900">Create a fan zone</h2>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-lg font-bold text-gray-900">{isEditMode ? 'Edit fan zone' : 'Create a fan zone'}</h2>
           <button onClick={resetAndClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none cursor-pointer">×</button>
         </div>
+        {isEditMode && (
+          <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 mb-4">
+            After saving, your fan zone will be hidden while it's reviewed. It'll reappear on the map once approved.
+          </p>
+        )}
 
         {/* Venue name */}
         <div className="mb-4">
@@ -273,8 +320,8 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
           />
         </div>
 
-        {/* Meeting point */}
-        <div className="mb-4">
+        {/* Meeting point — hidden in edit mode (location is frozen; see BACKLOGS.md) */}
+        {!isEditMode && <div className="mb-4">
           <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
             Meeting point
           </label>
@@ -295,7 +342,7 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
             </button>
           </div>
           <p className="text-xs text-gray-400 mt-1">Pan the map to your meeting point, or use GPS</p>
-        </div>
+        </div>}
 
         {/* Watch party toggle */}
         <div className="mb-4">
@@ -462,7 +509,7 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
           style={{ backgroundColor: canSubmit && !saving ? '#111827' : '#D1D5DB' }}
           className="w-full py-3.5 rounded-xl text-white text-sm font-semibold cursor-pointer"
         >
-          {saving ? 'Creating…' : 'Create fan zone'}
+          {saving ? (isEditMode ? 'Saving…' : 'Creating…') : (isEditMode ? 'Save changes' : 'Create fan zone')}
         </button>
         </div>
       </div>

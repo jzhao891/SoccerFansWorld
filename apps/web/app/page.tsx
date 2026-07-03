@@ -16,7 +16,7 @@ import ProfileSheet from '@/components/ProfileSheet';
 import { useMapStore } from '@/store/mapStore';
 import { useVenueSubscription } from '@/hooks/useVenueSubscription';
 import { usePlacesSearch } from '@/hooks/usePlacesSearch';
-import type { BoundingBox } from '@sfw/shared';
+import type { BoundingBox, FanZone } from '@sfw/shared';
 import type { MapClickPayload } from '@/components/MapView';
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false });
@@ -41,6 +41,7 @@ export default function MapPage() {
   const [sheetAddress, setSheetAddress] = useState<string | undefined>(undefined);
 
   const [createSheetOpen, setCreateSheetOpen] = useState(false);
+  const [editingVenue, setEditingVenue] = useState<FanZone | null>(null);
 
   // Auth UI. openSignIn stashes an optional onSuccess to resume a pending action (used by the
   // create-party gate, #31); the avatar opens it with no resume.
@@ -126,16 +127,26 @@ export default function MapPage() {
       )}
 
       <CreateWatchPartySheet
-        isOpen={createSheetOpen}
+        isOpen={createSheetOpen || editingVenue !== null}
         defaultLocation={sheetDefaultLocation}
         defaultSource={sheetSource}
         defaultVenueId={sheetVenueId}
         defaultAddress={sheetAddress}
-        onClose={() => setCreateSheetOpen(false)}
+        editingVenue={editingVenue}
+        onClose={() => {
+          const wasEditing = editingVenue !== null;
+          setCreateSheetOpen(false);
+          setEditingVenue(null);
+          if (wasEditing) {
+            setSelectedPlaceId(null);
+            setSelectedOsmVenue(null);
+          }
+        }}
       />
       <VenueDrawer
         onCreateParty={(loc, src, vid, addr) => handleCreateParty(loc, src, vid, addr)}
         onRequireSignIn={openSignIn}
+        onEditVenue={(fz) => setEditingVenue(fz)}
       />
 
       <SignInSheet

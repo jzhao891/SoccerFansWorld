@@ -48,9 +48,8 @@ export function removeRsvp(eventId: string, uid: string): Promise<void> {
 }
 
 // Owner-scoped venue edit. `patch` is limited to the editable content fields (VenueEditableFields);
-// identity/provenance/derived fields are frozen (enforced by the rules' == checks). Forces
-// activity_status back to INACTIVE so the edit re-enters the Admin-SDK moderation sweep (owner
-// can't self-publish). See docs/CHECKIN_LLD_DECISIONS.md.
+// identity/provenance/derived fields are frozen (enforced by the rules' == checks). Flips
+// activity_status to INACTIVE so the edit re-enters the activation sweeper before going live.
 export function updateVenue(eventId: string, patch: Partial<VenueEditableFields>): Promise<void> {
   return updateDoc(doc(getDb(), VENUES, eventId), { ...patch, activity_status: 'INACTIVE' });
 }

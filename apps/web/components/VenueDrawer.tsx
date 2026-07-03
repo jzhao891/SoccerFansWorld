@@ -4,7 +4,7 @@ import { useMapStore } from '@/store/mapStore';
 import { useMergedPlaces } from '@/hooks/useMergedPlaces';
 import EventCard from '@/components/EventCard';
 import { useVenueCheckins } from '@sfw/shared';
-import type { Vibe } from '@sfw/shared';
+import type { FanZone, Vibe } from '@sfw/shared';
 
 const VIBE_EMOJI: Record<Vibe, string> = { Chill: '😌', Buzzing: '🔥', Packed: '🤯' };
 
@@ -20,12 +20,13 @@ if (!aggregate.vibe) return null;
 
 interface Props {
   onCreateParty?: (location: { lat: number; lng: number }, source: 'google' | 'osm' | 'custom', venue_id: string | null, address?: string) => void;
-  // Opens the sign-in sheet, resuming `onSuccess` after auth (check-in/RSVP gate).
   onRequireSignIn: (onSuccess?: () => void) => void;
+  onEditVenue?: (fz: FanZone) => void;
 }
 
-export default function VenueDrawer({ onCreateParty, onRequireSignIn }: Props) {
+export default function VenueDrawer({ onCreateParty, onRequireSignIn, onEditVenue }: Props) {
   const selectedPlaceId = useMapStore((s) => s.selectedPlaceId);
+  const currentUser = useMapStore((s) => s.currentUser);
   const setSelectedPlaceId = useMapStore((s) => s.setSelectedPlaceId);
   const selectedOsmVenue = useMapStore((s) => s.selectedOsmVenue);
   const setSelectedOsmVenue = useMapStore((s) => s.setSelectedOsmVenue);
@@ -123,7 +124,12 @@ export default function VenueDrawer({ onCreateParty, onRequireSignIn }: Props) {
 
           {/* Events list — sorted by date then name in useMergedPlaces */}
           {events.map((fz) => (
-            <EventCard key={fz.id} fz={fz} onRequireSignIn={onRequireSignIn} />
+            <EventCard
+              key={fz.id}
+              fz={fz}
+              onRequireSignIn={onRequireSignIn}
+              onEdit={currentUser?.uid === fz.created_by ? () => onEditVenue?.(fz) : undefined}
+            />
           ))}
 
           {/* Empty state */}
