@@ -1,12 +1,11 @@
 import { useEffect } from 'react';
-import { collection, query, where, orderBy, onSnapshot, doc } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { geohashQueryBounds, distanceBetween } from 'geofire-common';
 import { getDb } from '../lib/firebase';
 import { useMapStore } from '../store/mapStore';
-import type { FanZone, LiveStatus } from '../types/map';
+import type { FanZone } from '../types/map';
 
 const VENUES_COLLECTION = 'venues';
-const LIVE_STATUSES_COLLECTION = 'live_statuses';
 
 function boundsToCenter(bounds: { north: number; south: number; east: number; west: number }) {
   return {
@@ -23,8 +22,6 @@ function boundsToRadiusKm(bounds: { north: number; south: number; east: number; 
 export function useVenueSubscription() {
   const bounds = useMapStore((s) => s.bounds);
   const setFanZones = useMapStore((s) => s.setFanZones);
-  const setLiveStatus = useMapStore((s) => s.setLiveStatus);
-  const removeLiveStatus = useMapStore((s) => s.removeLiveStatus);
 
   useEffect(() => {
     if (!bounds) return;
@@ -36,29 +33,6 @@ export function useVenueSubscription() {
 
     const venueQueryCleanupFns: (() => void)[] = [];
     const venueMap = new Map<string, FanZone>();
-    const liveStatusCleanupByVenueId = new Map<string, () => void>();
-
-    // TODO: DEAD CODE — live-status check-in is disabled, so this subscription always
-    // reads empty. Firestore `live_statuses` reads are left open (harmless) and writes
-    // are locked. Re-enable this (and the drawer summary UI) when the Auth flow +
-    // check-in trust model land. See docs/FIRESTORE_LLD_DECISION.md.
-    function subscribeToLiveStatus(venueId: string) {
-      if (liveStatusCleanupByVenueId.has(venueId)) return;
-      const unsub = onSnapshot(doc(db, LIVE_STATUSES_COLLECTION, venueId), (statusDoc) => {
-        if (statusDoc.exists()) {
-          setLiveStatus({ venue_id: venueId, ...statusDoc.data() } as LiveStatus);
-        } else {
-          removeLiveStatus(venueId);
-        }
-      });
-      liveStatusCleanupByVenueId.set(venueId, unsub);
-    }
-
-    function unsubscribeFromLiveStatus(venueId: string) {
-      liveStatusCleanupByVenueId.get(venueId)?.();
-      liveStatusCleanupByVenueId.delete(venueId);
-      removeLiveStatus(venueId);
-    }
 
     for (const [start, end] of geohashBounds) {
       const q = query(
@@ -80,10 +54,8 @@ export function useVenueSubscription() {
           const venue = { id: change.doc.id, ...data } as FanZone;
           if (change.type === 'removed') {
             venueMap.delete(venue.id);
-            unsubscribeFromLiveStatus(venue.id);
           } else {
             venueMap.set(venue.id, venue);
-            subscribeToLiveStatus(venue.id);
           }
         });
         setFanZones(Array.from(venueMap.values()));
@@ -94,8 +66,6 @@ export function useVenueSubscription() {
 
     return () => {
       venueQueryCleanupFns.forEach((fn) => fn());
-      liveStatusCleanupByVenueId.forEach((fn) => fn());
-      liveStatusCleanupByVenueId.clear();
     };
-  }, [bounds, setFanZones, setLiveStatus, removeLiveStatus]);
+  }, [bounds, setFanZones]);
 }

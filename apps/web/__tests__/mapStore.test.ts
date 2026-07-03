@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useMapStore } from '@/store/mapStore';
-import type { LiveStatus } from '@sfw/shared';
 
 const initialState = useMapStore.getState();
 
@@ -34,31 +33,6 @@ describe('mapStore', () => {
   it('setSelectedPlaceId stores the id', () => {
     useMapStore.getState().setSelectedPlaceId('place_123');
     expect(useMapStore.getState().selectedPlaceId).toBe('place_123');
-  });
-
-  it('setLiveStatus adds an entry keyed by venue_id', () => {
-    const status: LiveStatus = {
-      venue_id: 'v1',
-      crowd_index: 'Buzzing',
-      sound: 'On',
-      fan_ratio: null,
-      updated_at: 1000,
-    };
-    useMapStore.getState().setLiveStatus(status);
-    expect(useMapStore.getState().liveStatuses['v1']).toEqual(status);
-  });
-
-  it('removeLiveStatus deletes the entry', () => {
-    const status: LiveStatus = {
-      venue_id: 'v1',
-      crowd_index: 'Wild',
-      sound: 'Off',
-      fan_ratio: null,
-      updated_at: 1000,
-    };
-    useMapStore.getState().setLiveStatus(status);
-    useMapStore.getState().removeLiveStatus('v1');
-    expect(useMapStore.getState().liveStatuses['v1']).toBeUndefined();
   });
 
   it('setBounds updates bounds', () => {
