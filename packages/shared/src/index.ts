@@ -6,5 +6,8 @@ export * from './constants';
 export * from './store/mapStore';
 export * from './lib/firebase';
 export * from './lib/fogLayer';
+export * from './lib/checkinAggregation';
+export * from './lib/checkinWrites';
 export * from './hooks/useMergedPlaces';
 export * from './hooks/useVenueSubscription';
+export * from './hooks/useVenueCheckins';

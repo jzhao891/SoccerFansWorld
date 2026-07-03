@@ -11,7 +11,13 @@ import { getAdminDb } from '../lib/admin';
 // which only the rule-exempt Admin SDK can do. Admin auth comes from serviceAccountKey.json
 // or GOOGLE_APPLICATION_CREDENTIALS (see lib/admin.ts); GOOGLE_PLACES_API_KEY still loads
 // from apps/web/.env.local.
+dotenv.config({ path: path.resolve(process.cwd(), 'backend/.env') });
 dotenv.config({ path: path.resolve(process.cwd(), 'apps/web/.env.local') });
+
+if (!process.env.SEED_OWNER_UID) {
+  console.error('Missing SEED_OWNER_UID in backend/.env — set it to your Firebase Auth uid.');
+  process.exit(1);
+}
 
 // ---- Logger (console + file) ----
 
@@ -252,7 +258,8 @@ async function main() {
         ...(event.url ? { url: event.url } : {}),
         // Seeded venues are curated, so they go straight to ACTIVE unless the input opts out.
         activity_status: (event.is_active ?? true) ? 'ACTIVE' : 'INACTIVE',
-        created_by: 'admin',
+        // Seeded venues are owned by the platform admin so the owner can edit them via the UI.
+        created_by: process.env.SEED_OWNER_UID!,
         created_at: Date.now(),
       };
 

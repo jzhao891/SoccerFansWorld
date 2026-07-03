@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { signInWithGoogle, signInWithApple, signInWithEmail, signUpWithEmail } from '@/lib/auth';
+import { signInWithGoogle, signInWithEmail, signUpWithEmail, sendPasswordReset } from '@/lib/auth';
 
 // Maps Firebase auth error codes to friendly messages.
 function prettyError(e: unknown): string {
@@ -28,8 +28,9 @@ function prettyError(e: unknown): string {
   }
 }
 
-// Modal with Google / Apple / Email options. `onSuccess` resumes a pending action (e.g. the
-// create-party the user was attempting) after sign-in; it's called only on a successful auth.
+// Modal with Google + Email/Password (sign-in, sign-up, password reset). `onSuccess` resumes a
+// pending action (e.g. the create-party the user was attempting) after sign-in; it's called only
+// on a successful auth.
 export default function SignInSheet({
   isOpen,
   onClose,
@@ -43,6 +44,7 @@ export default function SignInSheet({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null); // success messages (e.g. reset sent)
   const [busy, setBusy] = useState(false);
 
   if (!isOpen) return null;
@@ -51,6 +53,7 @@ export default function SignInSheet({
     setEmail('');
     setPassword('');
     setError(null);
+    setNotice(null);
     setMode('signin');
     setBusy(false);
   }
@@ -63,6 +66,7 @@ export default function SignInSheet({
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       await fn();
       // Auth succeeded — AuthProvider's listener updates the store; resume any pending action.
@@ -77,6 +81,25 @@ export default function SignInSheet({
   function submitEmail(e: React.FormEvent) {
     e.preventDefault();
     void run(() => (mode === 'signin' ? signInWithEmail(email, password) : signUpWithEmail(email, password)));
+  }
+
+  async function handleForgotPassword() {
+    if (!email.trim()) {
+      setNotice(null);
+      setError('Enter your email above first, then tap "Forgot password".');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await sendPasswordReset(email.trim());
+      setNotice(`Password reset link sent to ${email.trim()} — check your inbox.`);
+    } catch (e) {
+      setError(prettyError(e));
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -95,16 +118,9 @@ export default function SignInSheet({
           <button
             onClick={() => void run(signInWithGoogle)}
             disabled={busy}
-            className="w-full mb-2 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer disabled:opacity-50"
-          >
-            Continue with Google
-          </button>
-          <button
-            onClick={() => void run(signInWithApple)}
-            disabled={busy}
             className="w-full py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer disabled:opacity-50"
           >
-            Continue with Apple
+            Continue with Google
           </button>
 
           <div className="flex items-center gap-3 my-4">
@@ -128,8 +144,20 @@ export default function SignInSheet({
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full mb-3 px-3 py-2.5 rounded-xl border border-gray-200 text-sm bg-gray-50 outline-none focus:border-gray-400 text-gray-800"
+              className="w-full mb-2 px-3 py-2.5 rounded-xl border border-gray-200 text-sm bg-gray-50 outline-none focus:border-gray-400 text-gray-800"
             />
+            {mode === 'signin' && (
+              <div className="mb-3 text-right">
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={busy}
+                  className="text-xs text-gray-500 hover:text-gray-800 underline cursor-pointer disabled:opacity-50"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
             <button
               type="submit"
               disabled={busy}
@@ -141,6 +169,7 @@ export default function SignInSheet({
           </form>
 
           {error && <p className="mt-3 text-sm text-red-500">{error}</p>}
+          {notice && <p className="mt-3 text-sm text-green-600">{notice}</p>}
 
           <p className="mt-4 text-center text-sm text-gray-500">
             {mode === 'signin' ? 'No account?' : 'Have an account?'}{' '}
@@ -148,6 +177,7 @@ export default function SignInSheet({
               onClick={() => {
                 setMode(mode === 'signin' ? 'signup' : 'signin');
                 setError(null);
+                setNotice(null);
               }}
               className="font-medium text-gray-900 underline cursor-pointer"
             >

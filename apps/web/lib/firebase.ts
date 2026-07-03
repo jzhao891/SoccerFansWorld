@@ -12,12 +12,16 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Prevent re-initializing on hot reload
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+// Skip init when env vars are absent — Next.js imports this module during static generation
+// of built-in pages (/_not-found) even though AuthProvider is 'use client'. Without a guard,
+// initializeApp throws auth/invalid-api-key in preview builds where vars aren't injected.
+const app = process.env.NEXT_PUBLIC_FIREBASE_API_KEY
+  ? (getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0])
+  : null;
 
-export const db = initializeFirestore(app, { localCache: persistentLocalCache() });
-setDb(db);
+export const db = app ? initializeFirestore(app, { localCache: persistentLocalCache() }) : null as any; // null during SSR/build
+if (app) setDb(db);
 
 // Firebase Auth. Default web persistence is browserLocalPersistence (IndexedDB), so the
 // session survives reloads/relaunches — see AUTH_HLD §4.
-export const auth = getAuth(app);
+export const auth = app ? getAuth(app) : null as any; // null during SSR/build

@@ -1,9 +1,9 @@
 import {
   GoogleAuthProvider,
-  OAuthProvider,
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   signOut as firebaseSignOut,
 } from 'firebase/auth';
 import { auth } from './firebase';
@@ -17,10 +17,6 @@ export function signInWithGoogle() {
   return signInWithPopup(auth, new GoogleAuthProvider());
 }
 
-export function signInWithApple() {
-  return signInWithPopup(auth, new OAuthProvider('apple.com'));
-}
-
 export function signInWithEmail(email: string, password: string) {
   return signInWithEmailAndPassword(auth, email, password);
 }
@@ -29,6 +25,11 @@ export function signInWithEmail(email: string, password: string) {
 // onAuthStateChanged path then signs the user in.
 export function signUpWithEmail(email: string, password: string) {
   return createUserWithEmailAndPassword(auth, email, password);
+}
+
+// Sends a Firebase password-reset email (uses the Auth email template configured in the console).
+export function sendPasswordReset(email: string) {
+  return sendPasswordResetEmail(auth, email);
 }
 
 export function signOut() {
