@@ -22,6 +22,16 @@
 
 ## 🟠 High Importance / Low Urgency
 
+- **Mobile authentication (Firebase) — implement:** Web auth is live; the mobile (Expo) app has none. Design is in `docs/AUTH_LLD_DECISIONS.md` → *Mobile Implementation (Firebase)*. Decided: **`@react-native-google-signin/google-signin`** (Google), **`expo-apple-authentication`** (Apple, iOS-only), Email/Password via `firebase/auth`. Mirrors web (shared `AuthUser` + store + `onAuthStateChanged`) plus RN persistence + native config. **Before coding, verify exact APIs against the Expo SDK 56 docs (per `apps/mobile/AGENTS.md`)** — the firebase-12 `getReactNativePersistence` path + google-signin/apple-auth usage have drifted. Subtasks:
+  - **[prereq · Apple Developer]** App ID + "Sign in with Apple" capability, Services ID, sign-in private key (+ Key ID), Team ID.
+  - **[prereq · Firebase Console]** enable Apple provider (Services ID / Team ID / Key ID / key); Google iOS + Android OAuth client IDs; download `GoogleService-Info.plist` + `google-services.json`; note the Web client ID (for `GoogleSignin.configure`).
+  - **[code]** native deps + `app.config.ts` plugins: `@react-native-async-storage/async-storage`, `@react-native-google-signin/google-signin`, `expo-apple-authentication`; config plugins + `ios.usesAppleSignIn`; wire the native config files.
+  - **[code]** `lib/firebase.ts`: `initializeAuth` + `getReactNativePersistence(AsyncStorage)`. `lib/auth.ts`: `signInWithGoogle` (native → `signInWithCredential`), `signInWithApple` (expo-apple-authentication + nonce, iOS-only), `signInWithEmail`, `signUpWithEmail`, `sendPasswordReset`, `signOut`.
+  - **[code]** auth listener (`onAuthStateChanged → AuthUser → store`, in `App.tsx`) + RN `SignInSheet`/`ProfileSheet`/`ProfileAvatar` (Animated bottom-sheet pattern); mount avatar in `MapTopBar`, sheets in `MapScreen`.
+  - **[code]** gate `openCreateParty` (SignInSheet + resume) + `created_by = uid` in the mobile create sheet.
+  - **[prereq · EAS]** dev-client rebuild (`npx eas build --profile development`) — native modules require it; the new auth can't run/test until then.
+  - **[finalize]** test Google/Apple/Email + gated create + forgot-password + persistence on device, then enable the deferred venue create-auth rule (`request.auth != null && created_by == request.auth.uid`) — closes the create-auth half of #22 once both platforms authenticate.
+
 - **LLM-powered venue creation from URL or text prompt:** Allow admins or users to paste an event URL or raw text description. An LLM parses the input and extracts structured FanZone fields (name, address, event_title, start_time, end_time, watching_teams, amenities, organizer, url, description). For seeding: bulk-generate many docs from a single schedule page (e.g. a venue hosting 30+ World Cup watch parties). For users: pre-fill the creation form for review and confirmation before submitting to Firestore.
 
 - **Automated venue ingestion pipeline:** Unattended backend pipeline (scheduled/cron) that (1) crawls public internet sources — city / host-committee event pages, venue sites, fan-zone listings — for World Cup watch-party events; (2) uses an LLM to normalize each into the `venues.json` schema (validated team names, ISO start/end times with offsets, admission, amenities, organizers, url); (3) runs the existing `seed-venues.ts` writer to upsert into Firestore (reusing its Places lookup, geohash, validation, and dedupe). Distinct from the user-facing "LLM venue creation from URL/text" feature above — this is a bulk discovery-and-ingestion job, not a form helper. The current seed script is only stage 3; this item adds the crawl + LLM-extraction stages in front of it.
@@ -57,9 +67,13 @@
 
 - **Mobile Firestore persistence:** The Firebase JS SDK on React Native has no IndexedDB, so Firestore uses memory-only cache by default. Enabling persistence requires migrating to `@react-native-firebase/firestore` (native module, SQLite-backed). Web already uses `persistentLocalCache()` via IndexedDB.
 
+- **Improve Firebase auth emails (password reset / verification) — off-brand + landing in spam:** the default emails are generic and currently hit the **spam folder**. The spam is almost certainly the default sender `noreply@…firebaseapp.com` — a **shared** Firebase domain with no per-project reputation and not SPF/DKIM/DMARC-aligned to `fandar.ai`, so receivers distrust it. **Primary fix (stays on Firebase, no backend): "Customize domain"** (Auth → Templates → Customize domain) → verify `fandar.ai` and add the **SPF + DKIM (+ a DMARC)** DNS records, so mail sends from `noreply@fandar.ai` — this fixes **both** the spam/deliverability **and** the sender branding at once. Also tweak sender name / subject / body in the template editor (limited: no logo or custom HTML). *Optional, far-future only if we ever want fully-designed HTML emails (logo/layout):* generate the link server-side (`admin.auth().generatePasswordResetLink`) and send via an own provider (Resend/SendGrid) — needs a backend, **not** required for the spam fix. Triggered by the web forgot-password flow now shipping.
+
 ---
 
 ## 🟢 Low Importance / Low Urgency
+
+- **Editable venue location on edit:** The owner venue-edit sheet freezes `location`/`address`/`geohash` in v1 (edit = content fields only). Allow moving the pin later — but handle the `venue_id` desync first (a `google`/`osm` venue's `venue_id` points at a specific real place, so moving it while keeping `venue_id` is inconsistent; likely clear `venue_id`/`source` → `custom` on move) plus recompute address + geohash. See docs/CHECKIN_LLD_DECISIONS.md (owner-scoped venue edit).
 
 - **Event title editing via trust model:** Allow users to suggest edits to a venue's `event_title` from the drawer. Treat suggestions as votes — the most-voted title within a time window wins.
 

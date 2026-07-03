@@ -74,7 +74,9 @@ export default function MapView({ onBoundsChange, onMapClick, children }: MapVie
 
   const poiCursorActive = useRef(false);
   const handleMouseMove = useCallback((e: MapMouseEvent) => {
-    const features = e.target.queryRenderedFeatures(e.point, { layers: ['poi-label'] });
+    const features = e.target.getLayer('poi-label')
+      ? e.target.queryRenderedFeatures(e.point, { layers: ['poi-label'] })
+      : [];
     const canvas = e.target.getCanvas();
     if (features.length > 0) {
       canvas.style.cursor = 'pointer';
@@ -90,7 +92,9 @@ export default function MapView({ onBoundsChange, onMapClick, children }: MapVie
       if (!onMapClick) return;
 
       // Check if user clicked a Mapbox-rendered POI label (OSM data, zero network cost)
-      const features = e.target.queryRenderedFeatures(e.point, { layers: ['poi-label'] });
+      const features = e.target.getLayer('poi-label')
+        ? e.target.queryRenderedFeatures(e.point, { layers: ['poi-label'] })
+        : [];
       if (features.length > 0) {
         const f = features[0];
         const props = f.properties ?? {};

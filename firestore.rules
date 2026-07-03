@@ -2,30 +2,28 @@ rules_version = '2';
 
 // FandarAI — Firestore security rules
 //
-// INTERIM ("partial") ruleset. Firebase Auth is being introduced (web first). See
-// docs/FIRESTORE_LLD_DECISION.md for the full rationale.
+// Auth-gated posture (web has Firebase Auth; mobile auth is pending — mobile create/check-in
+// break until it lands, which is accepted). See docs/FIRESTORE_LLD_DECISION.md and
+// docs/CHECKIN_LLD_DECISIONS.md.
 // Posture:
-//   - reads OPEN to everyone (the map needs venues + the public live-status summary) — unchanged,
-//   - venue CREATE is allowed without sign-in for now: shape is VALIDATED (no garbage / oversized
-//     docs) AND forced to activity_status == 'INACTIVE' so clients can't self-publish — the
-//     Admin-SDK activation sweep is the only path to ACTIVE (seeding also writes ACTIVE via Admin
-//     SDK, which bypasses these rules). Requiring sign-in on create (request.auth != null &&
-//     created_by == request.auth.uid) is DEFERRED until mobile also has auth — else mobile creates
-//     (no auth yet) would break,
-//   - updates + deletes DENIED from clients (privileged mutation goes through the Admin SDK),
-//   - live_statuses writes DENIED (check-in is disabled; re-open with Auth + trust model),
-//   - users/{uid} (per-user metadata) OWNER-SCOPED via request.auth — the first auth-gated rule.
-//
-// TODO (once Auth lands): require request.auth != null on writes, enforce
-//   request.resource.data.created_by == request.auth.uid on create, and allow owner-scoped
-//   update/delete.
+//   - reads OPEN to everyone (the map needs venues; check-in/RSVP votes are public so every
+//     viewer can aggregate them client-side),
+//   - venue CREATE requires sign-in, shape-VALIDATED, and forced to activity_status ==
+//     'INACTIVE' so clients can't self-publish — the Admin-SDK activation sweep is the only
+//     path to ACTIVE (seeding also writes ACTIVE via Admin SDK, bypassing these rules),
+//   - venue UPDATE/DELETE are OWNER-scoped (created_by == uid); update freezes identity/
+//     provenance/derived fields and re-forces INACTIVE so an edit re-enters moderation,
+//   - check_ins / rsvps are per-EVENT subcollections: public read, owner-scoped write (doc id
+//     == uid ⇒ one vote/RSVP per user), shape-validated,
+//   - live_statuses (DEPRECATED) kept read-open until the check-in cleanup removes its reader,
+//   - users/{uid} (per-user metadata) OWNER-scoped via request.auth.
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // ---- Validation helpers ----
 
-    // Minimum required fields + type/enum/size checks for a FanZone doc on create.
+    // Minimum required fields + type/enum/size checks for a FanZone doc.
     // Extra fields are allowed; this only guarantees the core contract holds.
     function isValidFanZone(d) {
       return d.keys().hasAll([
@@ -58,31 +56,85 @@ service cloud.firestore {
              && (!('description' in d) || (d.description is string && d.description.size() <= 2000));
     }
 
-    // ---- Collections ----
-
-    // Fan zones / watch parties shown on the map.
-    match /venues/{venueId} {
-      allow read:           if true;
-      // Clients may only create hidden docs; the Admin-SDK activation sweep promotes to ACTIVE.
-      allow create:         if isValidFanZone(request.resource.data)
-                               && request.resource.data.activity_status == 'INACTIVE';
-      allow update, delete: if false; // locked until Auth (owner-scoped) + Admin-SDK tooling
+    // An owner edit may only touch content fields — freeze identity/provenance/derived/system.
+    function venueImmutablesUnchanged(before, after) {
+      return after.created_by == before.created_by
+             && after.created_at == before.created_at
+             && after.source == before.source
+             && after.venue_id == before.venue_id
+             && after.location == before.location
+             && after.geohash == before.geohash
+             && after.address == before.address;
     }
 
-    // Live crowd/sound summary per physical venue. Check-in is disabled, so nothing
-    // writes this and the read path is currently dead (see the TODO in
-    // useVenueSubscription.ts). Read is left OPEN (harmless — returns empty) rather than
-    // ripping out the subscription; writes stay locked. Revisit with Auth + the trust
-    // model (public summary read; raw votes in a separate write-only `check_ins`
-    // collection; server-side aggregation).
+    // A check-in vote: vibe required (3-level), binaries optional booleans, user_id == doc uid.
+    function isValidCheckIn(d, uid) {
+      return d.keys().hasAll(['user_id', 'vibe', 'updated_at'])
+             && d.user_id == uid
+             && d.vibe in ['Chill', 'Buzzing', 'Packed']
+             && d.updated_at is number
+             && (!('big_screen' in d) || d.big_screen is bool)
+             && (!('sound' in d) || d.sound is bool);
+    }
+
+    // An RSVP: just a keyed headcount entry, user_id == doc uid.
+    function isValidRsvp(d, uid) {
+      return d.keys().hasAll(['user_id', 'created_at'])
+             && d.user_id == uid
+             && d.created_at is number;
+    }
+
+    // ---- Collections ----
+
+    // Fan zones / watch parties shown on the map. venues doc id == a FanZone (event) doc.
+    match /venues/{venueId} {
+      allow read: if true;
+
+      // Sign-in required; clients may only create hidden docs stamped with their own uid.
+      allow create: if request.auth != null
+                    && isValidFanZone(request.resource.data)
+                    && request.resource.data.activity_status == 'INACTIVE'
+                    && request.resource.data.created_by == request.auth.uid;
+
+      // Owner-scoped edit: only the creator, content fields only, re-enters moderation.
+      allow update: if request.auth != null
+                    && resource.data.created_by == request.auth.uid
+                    && isValidFanZone(request.resource.data)
+                    && request.resource.data.activity_status == 'INACTIVE'
+                    && venueImmutablesUnchanged(resource.data, request.resource.data);
+
+      allow delete: if request.auth != null
+                    && resource.data.created_by == request.auth.uid;
+
+      // Per-event check-in votes. Public read (viewers aggregate client-side); one vote per
+      // user, enforced by doc id == uid.
+      match /check_ins/{uid} {
+        allow read: if true;
+        allow create, update: if request.auth != null
+                              && request.auth.uid == uid
+                              && isValidCheckIn(request.resource.data, uid);
+        allow delete: if request.auth != null && request.auth.uid == uid;
+      }
+
+      // Per-event RSVPs (headcount). Public read; one RSVP per user, doc id == uid.
+      match /rsvps/{uid} {
+        allow read: if true;
+        allow create, update: if request.auth != null
+                              && request.auth.uid == uid
+                              && isValidRsvp(request.resource.data, uid);
+        allow delete: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
+    // DEPRECATED — superseded by per-event check_ins. Read left open (harmless, returns empty)
+    // until the check-in cleanup removes the last subscribeToLiveStatus reader; writes locked.
     match /live_statuses/{venueId} {
       allow read:  if true;
       allow write: if false;
     }
 
     // Per-user app metadata (e.g. checkin_count). Owner-scoped: a user reads/writes ONLY their
-    // own doc, keyed by uid — the first rule that uses request.auth. The write (increment) is
-    // wired when check-in is re-enabled; the doc is created lazily on first write.
+    // own doc, keyed by uid.
     match /users/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }

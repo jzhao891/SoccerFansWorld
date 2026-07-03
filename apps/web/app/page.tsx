@@ -133,7 +133,10 @@ export default function MapPage() {
         defaultAddress={sheetAddress}
         onClose={() => setCreateSheetOpen(false)}
       />
-      <VenueDrawer onCreateParty={(loc, src, vid, addr) => handleCreateParty(loc, src, vid, addr)} />
+      <VenueDrawer
+        onCreateParty={(loc, src, vid, addr) => handleCreateParty(loc, src, vid, addr)}
+        onRequireSignIn={openSignIn}
+      />
 
       <SignInSheet
         isOpen={signInOpen}

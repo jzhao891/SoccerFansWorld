@@ -145,7 +145,9 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
   }
 
   async function handleSubmit() {
-    if (!canSubmit) return;
+    // Sign-in is gated upstream (app/page.tsx), but guard here too: the rules require
+    // created_by == request.auth.uid, so a signed-out submit would be rejected anyway.
+    if (!canSubmit || !currentUser) return;
     setSaving(true);
     try {
       const organizerList = organizers.split(',').map((o) => o.trim()).filter(Boolean);
@@ -168,7 +170,7 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
         ...(organizerList.length ? { organizers: organizerList } : {}),
         ...(url.trim() ? { url: url.trim() } : {}),
         activity_status: 'INACTIVE', // created hidden; the activation sweep validates + activates it (see BACKLOGS.md)
-        created_by: currentUser?.uid ?? '', // create is gated behind sign-in (app/page.tsx), so uid is set
+        created_by: currentUser.uid, // guarded above; rules require created_by == auth.uid
         created_at: Date.now(),
       });
       resetAndClose();
@@ -178,7 +180,7 @@ export default function CreateWatchPartySheet({ isOpen, onClose, defaultLocation
   }
 
   const canSubmit = Boolean(
-    venueName.trim() && eventTitle.trim() && kickoffTime &&
+    currentUser && venueName.trim() && eventTitle.trim() && kickoffTime &&
     (!isWatchParty || selectedTeams.length > 0),
   );
 
