@@ -8,7 +8,8 @@
     "seed": "tsx scripts/seed-venues.ts",
     "count": "tsx scripts/count-venues.ts",
     "cleanup-dupes": "tsx scripts/cleanup-dupes.ts",
-    "activation-sweep": "tsx sweepers/venue-activation-sweeper.ts"
+    "activation-sweep": "tsx sweepers/venue-activation-sweeper.ts",
+    "expiry-sweep": "tsx sweepers/venue-expiry-sweeper.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
