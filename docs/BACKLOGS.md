@@ -6,6 +6,20 @@
 
 - **Firestore security rules:** Currently all Firestore reads and writes are open. Add proper security rules: `live_statuses` and `venues` should require Auth for writes; read access can remain open. Watch party creation (`venues` collection) should only allow writes from authenticated users and enforce that `created_by` matches the requesting user's UID. Consider rate-limiting rules to prevent abuse.
 
+- **Complete venue seeding pipeline — add crawler stage:** The seed pipeline currently has two of three stages: (2) LLM normalization (`seed-venues.ts`) and (3) Firestore write. Stage (1) — automated discovery — is missing. Build a crawler that finds World Cup 2026 watch-party events from public sources (city fan-zone pages, venue websites, host-committee listings, Eventbrite/Meetup searches) and outputs a `venues.json`-compatible payload for stage 2. Subtasks:
+  - **[design]** Identify target sources per host city (Seattle, NYC, LA, Dallas, SF, KC, Miami, Atlanta, Boston, Philadelphia). Prioritize official FIFA/city fan-zone pages and high-signal event aggregators.
+  - **[code]** `backend/crawlers/venue-crawler.ts` — HTTP fetch + HTML parse (Cheerio or Playwright for JS-rendered pages); extract venue name, address, event title, date/time, teams, URL per listing.
+  - **[code]** Pipe crawler output through the existing LLM normalization step (`lib/llm.ts`) to produce validated `SeedVenue[]` — reuse the team-name validation and schema enforcement already in `seed-venues.ts`.
+  - **[code]** Wire into a `npm run crawl` script in `backend/package.json`; optionally chain directly into `npm run seed` for a single-command ingest.
+  - **[ops]** Schedule as a nightly cron (Cloud Scheduler → Cloud Run or a simple cron on a VPS) so new events auto-populate without manual runs.
+
+- **Automatic advertisement:** Automatically promote FandarAI and newly added fan zones across channels to drive discovery and sign-ups. Subtasks:
+  - **[social · X/Twitter]** Auto-post when a new fan zone goes ACTIVE: "🏟️ New watch party added in [City] — [event_title] at [name]. Find it on fandar.ai #FIFAWorldCup2026". Use the X API v2 (`POST /2/tweets`) with an app-level bearer token stored in `backend/.env`.
+  - **[social · Instagram/Threads]** Queue a card-image post (use the existing fan-card compositor in `apps/web/lib/compose/`) per new fan zone batch. Threads API or Buffer/Zapier integration.
+  - **[email · waitlist/digest]** Weekly digest email to signed-up users listing new fan zones near their last known city. Resend or SendGrid, triggered by a backend cron.
+  - **[SEO]** Generate static city landing pages (`/seattle`, `/nyc`, etc.) listing active fan zones — makes FandarAI indexable and drives organic search traffic for "World Cup 2026 watch party [city]".
+  - **[ops]** Track performance (clicks, sign-ups, fan-zone opens) per channel using UTM params + a simple Firestore `ad_events` collection or a Plausible/PostHog event.
+
 - **Mapbox token URL allowlist:** The `NEXT_PUBLIC_MAPBOX_TOKEN` is visible in the browser bundle. Restrict it to your domain in the Mapbox dashboard (Account → Access tokens → edit token → Allowed URLs) so it can't be used on other sites. Add both the Vercel preview URL and the custom domain once set up.
 
 - **Apple Sign in with Apple — complete Service ID configuration:** Blocked until the iOS App ID (bundle ID) is registered. See `INFRASTRUCTURES.md` → Firebase Auth → Step 4 for the exact steps to complete.
