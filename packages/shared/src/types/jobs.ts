@@ -1,11 +1,21 @@
 export type JobStatus = "pending" | "queued" | "done" | "error";
 export type JobType = "image" | "video";
+/** Which backend actually runs the model. fal is paid/queued+webhook; huggingface is free and
+ *  resolved synchronously inside the Cloud Function (no queue, no webhook). */
+export type JobProvider = "fal" | "huggingface";
 
 /** Shape written to Firestore `jobs/{jobId}` by the caller before creation. */
 export interface JobInput {
-  /** fal endpoint ID, e.g. "fal-ai/bytedance/seedance/v1/pro/image-to-video" */
+  provider: JobProvider;
+  /** fal endpoint ID (provider "fal"), e.g. "easel-ai/advanced-face-swap" —
+   *  for provider "huggingface" this is just a descriptive label (e.g. the HF Space id). */
   endpoint: string;
-  /** fal input payload — all assets must already be public URLs (pre-upload via fal.storage.upload) */
+  /**
+   * Provider-specific payload — all assets must already be public URLs (pre-upload via
+   * fal.storage.upload, used purely as free file hosting regardless of provider).
+   *   fal:          the exact fal input object (e.g. face_image_0, target_image, ...)
+   *   huggingface:  { srcImageUrl: string, destImageUrl: string }
+   */
   input: Record<string, unknown>;
   /** Drives UX expectations only; does not affect processing */
   jobType: JobType;

@@ -32,7 +32,7 @@ async function uploadToFal(body: Record<string, string>): Promise<string> {
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Creating job…",
-  queued:  "Queued — fal is processing…",
+  queued:  "Queued — processing…",
   done:    "Done",
   error:   "Failed",
 };
@@ -55,13 +55,8 @@ export default function JobTestPage() {
   const [log, setLog]                 = useState<string[]>([]);
   const [job, setJob]                 = useState<JobDoc | null>(null);
   const unsubRef = useRef<(() => void) | null>(null);
-  const currentUser = useMapStore((s) => s.currentUser);
   const [signInOpen, setSignInOpen] = useState(false);
-  const pendingResume = useRef<(() => void) | null>(null);
-  const openSignIn = useCallback((onSuccess?: () => void) => {
-    pendingResume.current = onSuccess ?? null;
-    setSignInOpen(true);
-  }, []);
+  const openSignIn = useCallback(() => setSignInOpen(true), []);
 
   // Clean up Firestore listener on unmount
   useEffect(() => () => { unsubRef.current?.(); }, []);
@@ -82,10 +77,14 @@ export default function JobTestPage() {
 
   async function handleSubmit() {
     if (!photoUrl) return;
-    // Gate: submitting a job requires sign-in. Stash this exact call and resume it
-    // after the user signs in (the SignInSheet calls onSuccess on success).
-    if (!currentUser) {
-      openSignIn(() => handleSubmit());
+    // Gate: submitting a job requires sign-in. Unlike handleCreateParty (which only
+    // resumes into a review sheet), this call fires the real submission — uploads,
+    // Firestore write, and the Cloud Function job — with no review step of its own.
+    // So sign-in does NOT auto-resume it: closing the sheet just clears the gate,
+    // and the user has to explicitly click "Submit async job" again to confirm.
+    const user = useMapStore.getState().currentUser;
+    if (!user) {
+      openSignIn();
       return;
     }
     setBusy(true);
@@ -94,30 +93,29 @@ export default function JobTestPage() {
     unsubRef.current?.();
 
     try {
-      // 1. Upload face image to fal storage (server-side proxy keeps FAL_KEY secret)
-      addLog("Uploading face image to fal storage…");
+      // 1. Upload face image (free — fal.storage.upload used purely as a public file host)
+      addLog("Uploading face image…");
       const faceUrl = await uploadToFal({ base64: photoUrl, name: "face.jpg", mimeType: "image/jpeg" });
       addLog("Face uploaded.");
 
-      // 2. Upload the player template from /public (can't be reached by fal during local dev)
+      // 2. Upload the player template from /public (not reachable by the Cloud Function otherwise)
       addLog(`Uploading player template (${selectedTeam.id}/${selectedPose.id})…`);
       const templateUrl = await uploadToFal({ publicPath: `players/${selectedTeam.id}/${selectedPose.id}.png` });
       addLog("Template uploaded.");
 
-      // 3. Create Firestore job doc — Cloud Function picks this up and calls fal.queue.submit
+      // 3. Create Firestore job doc — Cloud Function picks this up and runs the free
+      // HuggingFace (tonyassi/face-swap) model synchronously, no queue/webhook needed.
       addLog("Creating job in Firestore…");
       const ref: DocumentReference = await addDoc(collection(db, "jobs"), {
-        endpoint: "easel-ai/advanced-face-swap",
+        provider:  "huggingface",
+        endpoint:  "tonyassi/face-swap",
         input: {
-          face_image_0:  faceUrl,
-          target_image:  templateUrl,
-          gender_0:      "male",
-          workflow_type: "target_hair",
-          upscale:       true,
+          srcImageUrl:  faceUrl,
+          destImageUrl: templateUrl,
         },
         jobType:   "image",
         userEmail: email || "test@example.com",
-        ownerUid:  currentUser.uid,
+        ownerUid:  user.uid,
         status:    "pending",
         createdAt: serverTimestamp(),
       });
@@ -324,7 +322,7 @@ export default function JobTestPage() {
       <SignInSheet
         isOpen={signInOpen}
         onClose={() => setSignInOpen(false)}
-        onSuccess={() => { pendingResume.current?.(); pendingResume.current = null; }}
+        onSuccess={() => addLog("Signed in — click “Submit async job” to continue.")}
       />
     </main>
   );
