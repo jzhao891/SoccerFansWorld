@@ -23,7 +23,6 @@ const MapView = dynamic(() => import('@/components/MapView'), { ssr: false });
 
 export default function MapPage() {
   const setBounds = useMapStore((s) => s.setBounds);
-  const currentUser = useMapStore((s) => s.currentUser);
   const selectedPlaceId = useMapStore((s) => s.selectedPlaceId);
   const setSelectedOsmVenue = useMapStore((s) => s.setSelectedOsmVenue);
   const setSelectedPlaceId = useMapStore((s) => s.setSelectedPlaceId);
@@ -86,7 +85,13 @@ export default function MapPage() {
   ) {
     // Gate: creating a fan zone requires sign-in. Stash this exact call and resume it
     // after the user signs in (the SignInSheet calls onSuccess on success).
-    if (!currentUser) {
+    //
+    // Read the store directly (not the hook-bound `currentUser`) — when this call is
+    // the *resumed* pending action, it's the same closure created back when the gate
+    // first fired, so the outer `currentUser` is stale (still null from that render).
+    // useMapStore.getState() always reflects the live store, sidestepping the race
+    // between the auth-state update and React re-rendering this component.
+    if (!useMapStore.getState().currentUser) {
       openSignIn(() => handleCreateParty(location, source, venue_id, address));
       return;
     }

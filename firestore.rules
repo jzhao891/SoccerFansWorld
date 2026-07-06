@@ -17,6 +17,8 @@ rules_version = '2';
 //     == uid ⇒ one vote/RSVP per user), shape-validated,
 //   - live_statuses (DEPRECATED) kept read-open until the check-in cleanup removes its reader,
 //   - users/{uid} (per-user metadata) OWNER-scoped via request.auth.
+//   - jobs/{jobId} (async fal.ai/HuggingFace face-swap queue, feat/migrate-create-shared-engine
+//     branch only) — owner-scoped via request.auth, same as venues/check_ins above.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -137,6 +139,21 @@ service cloud.firestore {
     // own doc, keyed by uid.
     match /users/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Async fal.ai/HuggingFace face-swap job queue (feat/migrate-create-shared-engine branch).
+    // Client may create its own job (owner uid must match the signed-in Firebase Auth user)
+    // and only in the initial "pending" state. Cloud Function / webhook transitions (queued →
+    // done/error) go through the Admin SDK, which bypasses these rules.
+    match /jobs/{jobId} {
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.ownerUid
+                    && request.resource.data.status == 'pending';
+
+      allow read: if request.auth != null
+                  && request.auth.uid == resource.data.ownerUid;
+
+      allow update, delete: if false;
     }
 
     // Everything else: deny by default.

@@ -2,6 +2,7 @@ export * from './types/map';
 export * from './types/auth';
 export * from './types/api';
 export * from './types/frame';
+export * from './types/jobs';
 export * from './constants';
 export * from './store/mapStore';
 export * from './lib/firebase';
