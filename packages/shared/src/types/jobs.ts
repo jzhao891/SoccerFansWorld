@@ -11,6 +11,8 @@ export interface JobInput {
   jobType: JobType;
   /** Where to send the "your result is ready" email */
   userEmail: string;
+  /** Firebase Auth uid (anonymous or real) that owns this job — enforced by Firestore rules */
+  ownerUid: string;
   status: "pending";
   createdAt: unknown; // serverTimestamp()
 }

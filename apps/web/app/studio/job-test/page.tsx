@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { collection, addDoc, onSnapshot, serverTimestamp, type DocumentReference } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { JobDoc } from "@sfw/shared";
+import { useAuthStore, type JobDoc } from "@sfw/shared";
 
 const POSES = [
   { id: "celebration", label: "Celebration" },
@@ -54,6 +54,7 @@ export default function JobTestPage() {
   const [log, setLog]                 = useState<string[]>([]);
   const [job, setJob]                 = useState<JobDoc | null>(null);
   const unsubRef = useRef<(() => void) | null>(null);
+  const currentUser = useAuthStore((s) => s.currentUser);
 
   // Clean up Firestore listener on unmount
   useEffect(() => () => { unsubRef.current?.(); }, []);
@@ -74,6 +75,10 @@ export default function JobTestPage() {
 
   async function handleSubmit() {
     if (!photoUrl) return;
+    if (!currentUser) {
+      addLog("Still signing in — try again in a moment.");
+      return;
+    }
     setBusy(true);
     setLog([]);
     setJob(null);
@@ -103,6 +108,7 @@ export default function JobTestPage() {
         },
         jobType:   "image",
         userEmail: email || "test@example.com",
+        ownerUid:  currentUser.uid,
         status:    "pending",
         createdAt: serverTimestamp(),
       });
@@ -232,7 +238,7 @@ export default function JobTestPage() {
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={!photoUrl || busy}
+              disabled={!photoUrl || busy || !currentUser}
               className="w-full rounded-full bg-gradient-to-r from-emerald-300 via-teal-200 to-slate-100 px-7 py-4 text-sm font-black uppercase tracking-[0.22em] text-slate-950 shadow-[0_0_34px_rgba(52,211,153,0.28)] transition enabled:hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-45"
             >
               {busy ? "Setting up job…" : "Submit async job"}

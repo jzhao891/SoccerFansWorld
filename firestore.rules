@@ -1,0 +1,164 @@
+rules_version = '2';
+
+// FandarAI — Firestore security rules
+//
+// Auth-gated posture (web has Firebase Auth; mobile auth is pending — mobile create/check-in
+// break until it lands, which is accepted). See docs/FIRESTORE_LLD_DECISION.md and
+// docs/CHECKIN_LLD_DECISIONS.md.
+// Posture:
+//   - reads OPEN to everyone (the map needs venues; check-in/RSVP votes are public so every
+//     viewer can aggregate them client-side),
+//   - venue CREATE requires sign-in, shape-VALIDATED, and forced to activity_status ==
+//     'INACTIVE' so clients can't self-publish — the Admin-SDK activation sweep is the only
+//     path to ACTIVE (seeding also writes ACTIVE via Admin SDK, bypassing these rules),
+//   - venue UPDATE/DELETE are OWNER-scoped (created_by == uid); update freezes identity/
+//     provenance/derived fields and re-forces INACTIVE so an edit re-enters moderation,
+//   - check_ins / rsvps are per-EVENT subcollections: public read, owner-scoped write (doc id
+//     == uid ⇒ one vote/RSVP per user), shape-validated,
+//   - live_statuses (DEPRECATED) kept read-open until the check-in cleanup removes its reader,
+//   - users/{uid} (per-user metadata) OWNER-scoped via request.auth.
+//   - jobs/{jobId} (async fal.ai/HuggingFace face-swap queue, feat/migrate-create-shared-engine
+//     branch only) — owner-scoped via request.auth, same as venues/check_ins above.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- Validation helpers ----
+
+    // Minimum required fields + type/enum/size checks for a FanZone doc.
+    // Extra fields are allowed; this only guarantees the core contract holds.
+    function isValidFanZone(d) {
+      return d.keys().hasAll([
+               'source', 'venue_id', 'name', 'address', 'location', 'geohash',
+               'event_title', 'admission', 'activity_status',
+               'created_by', 'created_at'
+             ])
+             && d.source in ['google', 'osm', 'custom']
+             && d.name is string && d.name.size() > 0 && d.name.size() <= 200
+             && d.address is string && d.address.size() <= 500
+             && d.event_title is string && d.event_title.size() > 0 && d.event_title.size() <= 300
+             && d.location.lat is number && d.location.lng is number
+             && d.geohash is string
+             && d.admission in ['free', 'paid']
+             && d.activity_status in ['ACTIVE', 'INACTIVE', 'REJECTED']
+             && d.created_by is string
+             && d.created_at is number
+             // venue_id is a string for google/osm, null for custom
+             && (d.venue_id == null || d.venue_id is string)
+             // optional fields — validated only when present.
+             // NOTE: the rules language has no list iteration, so we can only assert
+             // watching_teams/organizers are lists — per-element string/length checks
+             // must be enforced in the app frontend.
+             && (!('start_time' in d) || d.start_time is number)
+             && (!('end_time' in d) || d.end_time is number)
+             && (!('amenities' in d) || d.amenities is list)
+             && (!('watching_teams' in d) || d.watching_teams is list)
+             && (!('organizers' in d) || d.organizers is list)
+             && (!('url' in d) || (d.url is string && d.url.size() <= 2000))
+             && (!('description' in d) || (d.description is string && d.description.size() <= 2000));
+    }
+
+    // An owner edit may only touch content fields — freeze identity/provenance/derived/system.
+    function venueImmutablesUnchanged(before, after) {
+      return after.created_by == before.created_by
+             && after.created_at == before.created_at
+             && after.source == before.source
+             && after.venue_id == before.venue_id
+             && after.location == before.location
+             && after.geohash == before.geohash
+             && after.address == before.address;
+    }
+
+    // A check-in vote: vibe required (3-level), binaries optional booleans, user_id == doc uid.
+    function isValidCheckIn(d, uid) {
+      return d.keys().hasAll(['user_id', 'vibe', 'updated_at'])
+             && d.user_id == uid
+             && d.vibe in ['Chill', 'Buzzing', 'Packed']
+             && d.updated_at is number
+             && (!('big_screen' in d) || d.big_screen is bool)
+             && (!('sound' in d) || d.sound is bool);
+    }
+
+    // An RSVP: just a keyed headcount entry, user_id == doc uid.
+    function isValidRsvp(d, uid) {
+      return d.keys().hasAll(['user_id', 'created_at'])
+             && d.user_id == uid
+             && d.created_at is number;
+    }
+
+    // ---- Collections ----
+
+    // Fan zones / watch parties shown on the map. venues doc id == a FanZone (event) doc.
+    match /venues/{venueId} {
+      allow read: if true;
+
+      // Sign-in required; clients may only create hidden docs stamped with their own uid.
+      allow create: if request.auth != null
+                    && isValidFanZone(request.resource.data)
+                    && request.resource.data.activity_status == 'INACTIVE'
+                    && request.resource.data.created_by == request.auth.uid;
+
+      // Owner-scoped edit: only the creator, content fields only, re-enters moderation.
+      allow update: if request.auth != null
+                    && resource.data.created_by == request.auth.uid
+                    && isValidFanZone(request.resource.data)
+                    && request.resource.data.activity_status == 'INACTIVE'
+                    && venueImmutablesUnchanged(resource.data, request.resource.data);
+
+      allow delete: if request.auth != null
+                    && resource.data.created_by == request.auth.uid;
+
+      // Per-event check-in votes. Public read (viewers aggregate client-side); one vote per
+      // user, enforced by doc id == uid.
+      match /check_ins/{uid} {
+        allow read: if true;
+        allow create, update: if request.auth != null
+                              && request.auth.uid == uid
+                              && isValidCheckIn(request.resource.data, uid);
+        allow delete: if request.auth != null && request.auth.uid == uid;
+      }
+
+      // Per-event RSVPs (headcount). Public read; one RSVP per user, doc id == uid.
+      match /rsvps/{uid} {
+        allow read: if true;
+        allow create, update: if request.auth != null
+                              && request.auth.uid == uid
+                              && isValidRsvp(request.resource.data, uid);
+        allow delete: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
+    // DEPRECATED — superseded by per-event check_ins. Read left open (harmless, returns empty)
+    // until the check-in cleanup removes the last subscribeToLiveStatus reader; writes locked.
+    match /live_statuses/{venueId} {
+      allow read:  if true;
+      allow write: if false;
+    }
+
+    // Per-user app metadata (e.g. checkin_count). Owner-scoped: a user reads/writes ONLY their
+    // own doc, keyed by uid.
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Async fal.ai/HuggingFace face-swap job queue (feat/migrate-create-shared-engine branch).
+    // Client may create its own job (owner uid must match the signed-in Firebase Auth user)
+    // and only in the initial "pending" state. Cloud Function / webhook transitions (queued →
+    // done/error) go through the Admin SDK, which bypasses these rules.
+    match /jobs/{jobId} {
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.ownerUid
+                    && request.resource.data.status == 'pending';
+
+      allow read: if request.auth != null
+                  && request.auth.uid == resource.data.ownerUid;
+
+      allow update, delete: if false;
+    }
+
+    // Everything else: deny by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
