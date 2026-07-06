@@ -8,21 +8,17 @@ interface Props {
 }
 
 export default function MapContextMenu({ x, y, onCreateParty, onClose }: Props) {
-  // Adjust so menu never overflows the right or bottom edge
-  const left = Math.min(x, window.innerWidth - 180);
-  const top = Math.min(y, window.innerHeight - 80);
+  // Adjust so the button never overflows the right or bottom edge
+  const left = Math.min(x, window.innerWidth - 150);
+  const top = Math.min(y, window.innerHeight - 60);
 
   return (
-    <div
-      style={{ top, left }}
-      className="fixed z-30 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden w-44"
-    >
+    <div style={{ top, left }} className="fixed z-30">
       <button
         onClick={() => { onCreateParty(); onClose(); }}
-        className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+        className="px-4 py-2 rounded-lg bg-gray-900/80 text-xs font-semibold text-white hover:bg-gray-900/90 whitespace-nowrap cursor-pointer shadow-lg"
       >
-        <span>🎉</span>
-        <span>Create watch party</span>
+        Create fan zone
       </button>
     </div>
   );

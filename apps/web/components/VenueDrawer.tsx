@@ -1,49 +1,41 @@
 'use client';
 
-import { useState } from 'react';
-import { doc, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { useMapStore } from '@/store/mapStore';
 import { useMergedPlaces } from '@/hooks/useMergedPlaces';
-import type { LiveStatus } from '@sfw/shared';
+import EventCard from '@/components/EventCard';
+import { useVenueCheckins } from '@sfw/shared';
+import type { FanZone, Vibe } from '@sfw/shared';
 
-const CROWD_OPTIONS: LiveStatus['crowd_index'][] = ['Chill', 'Buzzing', 'Packed', 'Wild'];
+const VIBE_EMOJI: Record<Vibe, string> = { Chill: '😌', Buzzing: '🔥', Packed: '🤯' };
 
-const CROWD_EMOJI: Record<string, string> = {
-  Chill: '😌',
-  Buzzing: '🔥',
-  Packed: '🤯',
-  Wild: '🦁',
-};
-
-interface Props {
-  onCreateParty?: (location: { lat: number; lng: number }, source: 'google' | 'osm' | 'custom', venue_id: string | null) => void;
+function VibeBadges({ eventId, startTime }: { eventId: string; startTime?: number | null }) {
+  const { aggregate } = useVenueCheckins(eventId, startTime ?? null);
+if (!aggregate.vibe) return null;
+  return (
+    <span className="text-[11px] text-gray-500 mt-0.5">
+      {VIBE_EMOJI[aggregate.vibe]} {aggregate.vibe}
+    </span>
+  );
 }
 
-export default function VenueDrawer({ onCreateParty }: Props) {
+interface Props {
+  onCreateParty?: (location: { lat: number; lng: number }, source: 'google' | 'osm' | 'custom', venue_id: string | null, address?: string) => void;
+  onRequireSignIn: (onSuccess?: () => void) => void;
+  onEditVenue?: (fz: FanZone) => void;
+}
+
+export default function VenueDrawer({ onCreateParty, onRequireSignIn, onEditVenue }: Props) {
   const selectedPlaceId = useMapStore((s) => s.selectedPlaceId);
+  const currentUser = useMapStore((s) => s.currentUser);
   const setSelectedPlaceId = useMapStore((s) => s.setSelectedPlaceId);
   const selectedOsmVenue = useMapStore((s) => s.selectedOsmVenue);
   const setSelectedOsmVenue = useMapStore((s) => s.setSelectedOsmVenue);
-  const liveStatuses = useMapStore((s) => s.liveStatuses);
   const mergedPlaces = useMergedPlaces();
-  const [saving, setSaving] = useState(false);
 
   const osmVenue = selectedOsmVenue;
   const place = osmVenue ? null : (mergedPlaces.find((p) => p.id === selectedPlaceId) ?? null);
-  const venueId = place?.fanZone?.id ?? null;
-  const liveStatus = venueId ? liveStatuses[venueId] ?? null : null;
-
-  async function checkIn(patch: Partial<Pick<LiveStatus, 'crowd_index' | 'sound'>>) {
-    if (!venueId) return;
-    setSaving(true);
-    await setDoc(
-      doc(db, 'live_statuses', venueId),
-      { venue_id: venueId, ...liveStatus, ...patch, updated_at: Date.now() },
-      { merge: true },
-    );
-    setSaving(false);
-  }
+  const events = place?.fanZones ?? [];
+  const rep = events[0] ?? null;
 
   const isOpen = osmVenue !== null || place !== null;
 
@@ -54,216 +46,100 @@ export default function VenueDrawer({ onCreateParty }: Props) {
 
   return (
     <>
-      {/* Backdrop */}
-      {isOpen && (
-        <div className="fixed inset-0 z-10" onClick={dismiss} />
-      )}
+      {/* Transparent click-catcher: a click anywhere dismisses the panel (map stays visible).
+          The next click then reaches the map and drops a pin / opens the relevant panel. */}
+      {isOpen && <div className="fixed inset-0 z-10" onClick={dismiss} />}
 
-      {/* Drawer */}
       <div
-        className={`fixed bottom-0 left-0 right-0 z-20 bg-white rounded-t-2xl shadow-2xl transition-transform duration-300 ease-in-out ${
-          isOpen ? 'translate-y-0' : 'translate-y-full'
+        className={`fixed top-4 left-4 z-20 w-[380px] max-w-[calc(100%-2rem)] max-h-[calc(100%-2rem)] overflow-y-auto bg-white rounded-2xl shadow-2xl transition-transform duration-300 ease-in-out ${
+          isOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1.5rem)]'
         }`}
       >
-        {/* OSM venue — name and category only */}
-        {osmVenue && (
-          <div className="p-5 pb-safe">
-            <div className="flex justify-center pt-1 pb-3 -mx-5 -mt-5 mb-2 cursor-pointer" onClick={dismiss}>
-              <div className="w-10 h-1 bg-gray-300 rounded-full" />
+      {/* OSM venue — name and category only */}
+      {osmVenue && (
+        <div className="p-5">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">{osmVenue.name}</h2>
+              <p className="text-sm text-gray-500 mt-0.5 capitalize">{osmVenue.category}</p>
             </div>
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">{osmVenue.name}</h2>
-                <p className="text-sm text-gray-500 mt-0.5 capitalize">{osmVenue.category}</p>
-              </div>
-              <button onClick={dismiss} className="text-gray-400 hover:text-gray-600 text-2xl leading-none ml-4">×</button>
-            </div>
-            {onCreateParty && (
-              <div className="border-t pt-4">
-                <button
-                  onClick={() => { onCreateParty(osmVenue.location, 'osm', osmVenue.id); dismiss(); }}
-                  className="w-full py-3 rounded-xl bg-gray-500/10 text-sm font-medium text-gray-600 hover:bg-gray-500/15 flex items-center justify-center gap-2"
-                >
-                  🎉 Create watch party here
-                </button>
-              </div>
-            )}
+            <button onClick={dismiss} className="text-gray-400 hover:text-gray-600 text-2xl leading-none ml-4">×</button>
           </div>
-        )}
+          {onCreateParty && (
+            <button
+              onClick={() => { onCreateParty(osmVenue.location, 'osm', osmVenue.id); dismiss(); }}
+              className="px-4 py-2 rounded-lg bg-gray-900/80 text-xs font-semibold text-white hover:bg-gray-900/90 cursor-pointer"
+            >
+              Create fan zone here
+            </button>
+          )}
+        </div>
+      )}
 
-        {place && (
-          <div className="p-5 pb-safe max-h-[75vh] overflow-y-auto">
-            {/* Handle — tall tap target, visually thin bar */}
-            <div className="flex justify-center pt-1 pb-3 -mx-5 -mt-5 mb-2 cursor-pointer" onClick={dismiss}>
-              <div className="w-10 h-1 bg-gray-300 rounded-full" />
-            </div>
-
-            {/* Header */}
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">{place.name}</h2>
-                {place.googleData?.vicinity && (
-                  <p className="text-sm text-gray-500 mt-0.5">{place.googleData.vicinity}</p>
-                )}
-              </div>
-              <button
-                onClick={dismiss}
-                className="text-gray-400 hover:text-gray-600 text-2xl leading-none ml-4"
-              >
-                ×
-              </button>
-            </div>
-
-            {/* Google data row */}
-            <div className="flex gap-4 mb-4 text-sm text-gray-600">
-              {place.googleData?.rating && (
-                <span>⭐ {place.googleData.rating}</span>
+      {place && (
+        <div className="p-5">
+          {/* Header */}
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">{place.name}</h2>
+              {events[0] && <VibeBadges eventId={events[0].id} startTime={events[0].start_time} />}
+              {(rep?.address || place.googleData?.vicinity) && (
+                <p className="text-sm text-gray-500 mt-0.5">{rep?.address ?? place.googleData?.vicinity}</p>
               )}
-              {place.googleData?.open_now !== undefined && (
-                <span className={place.googleData.open_now ? 'text-green-600' : 'text-red-500'}>
-                  {place.googleData.open_now ? 'Open now' : 'Closed'}
-                </span>
+              {place.googleData && (place.googleData.rating || place.googleData.open_now !== undefined) && (
+                <div className="flex gap-4 mt-1.5 text-sm text-gray-600">
+                  {place.googleData.rating && <span>⭐ {place.googleData.rating}</span>}
+                  {place.googleData.open_now !== undefined && (
+                    <span className={place.googleData.open_now ? 'text-green-600' : 'text-red-500'}>
+                      {place.googleData.open_now ? 'Open now' : 'Closed'}
+                    </span>
+                  )}
+                </div>
               )}
-              <span className={`capitalize px-2 py-0.5 rounded-full text-xs font-medium ${
-                place.source === 'fanzone' ? 'bg-orange-100 text-orange-700' :
-                'bg-blue-100 text-blue-700'
-              }`}>
-                {place.source === 'fanzone' ? (place.fanZone?.source ?? 'fanzone') : 'google'}
-              </span>
             </div>
-
-            {/* Fan zone data */}
-            {place.fanZone && (
-              <>
-                <div className="border-t pt-3 mb-3">
-                  <p className="text-sm font-semibold text-gray-700 mb-1">
-                    📺 {place.fanZone.event_title}
-                  </p>
-                  {place.fanZone.kickoff_time > 0 && (
-                    <p className="text-xs text-gray-500 mb-2">
-                      🕐 {new Date(place.fanZone.kickoff_time).toLocaleString(undefined, {
-                        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-                      })}
-                    </p>
-                  )}
-                  {place.fanZone.description && (
-                    <p className="text-xs text-gray-500 mb-2 italic">{place.fanZone.description}</p>
-                  )}
-                  {place.fanZone.watching_teams.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {place.fanZone.watching_teams.map((team) => (
-                        <span key={team} className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">
-                          {team}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {place.fanZone.amenities.length > 0 && (
-                  <div className="mb-3">
-                    <p className="text-xs text-gray-500 mb-1">Amenities</p>
-                    <div className="flex flex-wrap gap-1">
-                      {place.fanZone.amenities.map((a) => (
-                        <span key={a} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full capitalize">
-                          {a.replace(/_/g, ' ')}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* Live status */}
-            {liveStatus && (
-              <div className="border-t pt-3 flex gap-6 text-sm mb-4">
-                {liveStatus.crowd_index && (
-                  <div>
-                    <p className="text-xs text-gray-500 mb-0.5">Crowd</p>
-                    <p className="font-medium text-gray-900">
-                      {CROWD_EMOJI[liveStatus.crowd_index]} {liveStatus.crowd_index}
-                    </p>
-                  </div>
-                )}
-                {liveStatus.sound && (
-                  <div>
-                    <p className="text-xs text-gray-500 mb-0.5">Sound</p>
-                    <p className="font-medium text-gray-900">{liveStatus.sound === 'On' ? '🔊 On' : '🔇 Off'}</p>
-                  </div>
-                )}
-                {liveStatus.fan_ratio && (
-                  <div>
-                    <p className="text-xs text-gray-500 mb-0.5">Fan ratio</p>
-                    <p className="font-medium text-gray-900">{liveStatus.fan_ratio}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Create watch party */}
-            {onCreateParty && (
-              <div className="border-t pt-4 mb-2">
-                <button
-                  onClick={() => {
-                    const src = place.source === 'google' ? 'google' : (place.fanZone?.source ?? 'custom');
-                    const vid = place.source === 'google' ? place.id : (place.fanZone?.venue_id ?? null);
-                    onCreateParty(place.location, src, vid);
-                    setSelectedPlaceId(null);
-                  }}
-                  className="w-full py-3 rounded-xl bg-gray-500/10 text-sm font-medium text-gray-600 hover:bg-gray-500/15 flex items-center justify-center gap-2"
-                >
-                  🎉 Create watch party here
-                </button>
-              </div>
-            )}
-
-            {/* Check-in */}
-            {venueId && (
-              <div className="border-t pt-4">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                  Check in {saving && <span className="font-normal normal-case">Saving...</span>}
-                </p>
-
-                <p className="text-xs text-gray-500 mb-2">How&apos;s the crowd?</p>
-                <div className="flex gap-2 mb-4">
-                  {CROWD_OPTIONS.map((option) => {
-                    const selected = liveStatus?.crowd_index === option;
-                    return (
-                      <button
-                        key={option}
-                        onClick={() => checkIn({ crowd_index: option })}
-                        disabled={saving}
-                        style={{ backgroundColor: selected ? '#111827' : '#fff', color: selected ? '#fff' : '#374151' }}
-                        className="flex-1 py-3 rounded-lg text-sm font-medium border border-gray-200 transition-colors"
-                      >
-                        {CROWD_EMOJI[option!]} {option}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <p className="text-xs text-gray-500 mb-2">Sound on?</p>
-                <div className="flex gap-2">
-                  {(['On', 'Off'] as const).map((option) => {
-                    const selected = liveStatus?.sound === option;
-                    return (
-                    <button
-                      key={option}
-                      onClick={() => checkIn({ sound: option })}
-                      disabled={saving}
-                      style={{ backgroundColor: selected ? '#111827' : '#fff', color: selected ? '#fff' : '#374151' }}
-                      className="px-6 py-3 rounded-lg text-sm font-medium border border-gray-200 transition-colors"
-                    >
-                      {option === 'On' ? '🔊 On' : '🔇 Off'}
-                    </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            <button
+              onClick={dismiss}
+              className="text-gray-400 hover:text-gray-600 text-2xl leading-none ml-4"
+            >
+              ×
+            </button>
           </div>
-        )}
+
+          {/* Primary action — prominent, top */}
+          {onCreateParty && (
+            <button
+              onClick={() => {
+                const src = place.source === 'google' ? 'google' : (rep?.source ?? 'custom');
+                const vid = place.source === 'google' ? place.id : (rep?.venue_id ?? null);
+                // Google place + existing fan zone already carry an address — reuse it (no geocode).
+                const addr = place.source === 'google' ? place.googleData?.vicinity : rep?.address;
+                onCreateParty(place.location, src, vid, addr);
+                setSelectedPlaceId(null);
+              }}
+              className="px-4 py-2 rounded-lg bg-gray-900/80 text-xs font-semibold text-white hover:bg-gray-900/90 cursor-pointer mb-4"
+            >
+              Create fan zone here
+            </button>
+          )}
+
+          {/* Events list — sorted by date then name in useMergedPlaces */}
+          {events.map((fz) => (
+            <EventCard
+              key={fz.id}
+              fz={fz}
+              onRequireSignIn={onRequireSignIn}
+              onEdit={currentUser?.uid === fz.created_by ? () => onEditVenue?.(fz) : undefined}
+            />
+          ))}
+
+          {/* Empty state */}
+          {place.source === 'fanzone' && events.length === 0 && (
+            <div className="text-sm text-gray-500 text-center py-4">
+              No upcoming events.
+            </div>
+          )}
+        </div>
+      )}
       </div>
     </>
   );

@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { AuthProvider } from "@/components/AuthProvider";
+import AuthProvider from "@/components/AuthProvider";
 
 export const metadata: Metadata = {
-  title: "Soccer Fans World",
+  title: "FandarAI",
   description: "AI soccer fan trading card generator demo",
 };
 

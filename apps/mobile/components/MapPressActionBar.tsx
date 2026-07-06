@@ -27,7 +27,7 @@ export default function MapPressActionBar({ screen, onCreateParty }: Props) {
         style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
         onPress={onCreateParty}
       >
-        <Text style={styles.btnText}>Host Watch Party</Text>
+        <Text style={styles.btnText}>Create fan zone</Text>
       </Pressable>
       <View style={[styles.arrow, { marginLeft: arrowMarginLeft }]} />
     </View>

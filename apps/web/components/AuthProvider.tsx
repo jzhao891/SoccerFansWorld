@@ -1,31 +1,33 @@
-"use client";
+'use client';
 
-import { useEffect } from "react";
-import { onAuthStateChanged } from "firebase/auth";
-import { useAuthStore } from "@sfw/shared";
-import { auth } from "@/lib/firebase";
-import { signInAnon, toAuthUser } from "@/lib/auth";
+import { useEffect } from 'react';
+import { onAuthStateChanged, type User } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { useMapStore } from '@/store/mapStore';
+import type { AuthUser } from '@sfw/shared';
 
-/**
- * Runs once at the app root. Ensures every visitor has a Firebase Auth uid —
- * anonymous today, upgradeable to Google/Apple/Email later via linkWithCredential
- * without changing the uid (see docs/AUTH_LLD_DECISIONS.md).
- */
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const setCurrentUser = useAuthStore((s) => s.setCurrentUser);
-  const setAuthReady = useAuthStore((s) => s.setAuthReady);
+// Flatten the Firebase User into our lean, SDK-agnostic AuthUser (only the fields the app uses).
+function toAuthUser(user: User): AuthUser {
+  return {
+    uid: user.uid,
+    displayName: user.displayName,
+    email: user.email,
+    photoURL: user.photoURL,
+  };
+}
+
+// Runs once at the app root: subscribes to Firebase auth state and mirrors it into the Zustand
+// store as `currentUser` — the single reactive source every component reads (avoids each one
+// owning its own listener or coupling to the Firebase SDK). onAuthStateChanged returns its
+// unsubscribe fn, which doubles as the effect cleanup.
+export default function AuthProvider({ children }: { children: React.ReactNode }) {
+  const setCurrentUser = useMapStore((s) => s.setCurrentUser);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setCurrentUser(toAuthUser(user));
-        setAuthReady(true);
-      } else {
-        signInAnon().catch((err) => console.error("Anonymous sign-in failed:", err));
-      }
+    return onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user ? toAuthUser(user) : null);
     });
-    return unsubscribe;
-  }, [setCurrentUser, setAuthReady]);
+  }, [setCurrentUser]);
 
   return <>{children}</>;
 }

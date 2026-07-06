@@ -17,7 +17,7 @@ export default function MapMarkers() {
 
   const visiblePlaces = selectedTeam
     ? mergedPlaces.filter(
-        (p) => p.fanZone?.watching_teams.includes(selectedTeam) ?? false,
+        (p) => p.fanZones?.some((fz) => fz.watching_teams?.includes(selectedTeam)) ?? false,
       )
     : mergedPlaces;
 

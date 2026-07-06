@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ChangeEvent, useEffect, useRef, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
 import { collection, addDoc, onSnapshot, serverTimestamp, type DocumentReference } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { useAuthStore, type JobDoc } from "@sfw/shared";
+import { useMapStore, type JobDoc } from "@sfw/shared";
+import SignInSheet from "@/components/SignInSheet";
 
 const POSES = [
   { id: "celebration", label: "Celebration" },
@@ -54,7 +55,13 @@ export default function JobTestPage() {
   const [log, setLog]                 = useState<string[]>([]);
   const [job, setJob]                 = useState<JobDoc | null>(null);
   const unsubRef = useRef<(() => void) | null>(null);
-  const currentUser = useAuthStore((s) => s.currentUser);
+  const currentUser = useMapStore((s) => s.currentUser);
+  const [signInOpen, setSignInOpen] = useState(false);
+  const pendingResume = useRef<(() => void) | null>(null);
+  const openSignIn = useCallback((onSuccess?: () => void) => {
+    pendingResume.current = onSuccess ?? null;
+    setSignInOpen(true);
+  }, []);
 
   // Clean up Firestore listener on unmount
   useEffect(() => () => { unsubRef.current?.(); }, []);
@@ -75,8 +82,10 @@ export default function JobTestPage() {
 
   async function handleSubmit() {
     if (!photoUrl) return;
+    // Gate: submitting a job requires sign-in. Stash this exact call and resume it
+    // after the user signs in (the SignInSheet calls onSuccess on success).
     if (!currentUser) {
-      addLog("Still signing in — try again in a moment.");
+      openSignIn(() => handleSubmit());
       return;
     }
     setBusy(true);
@@ -238,7 +247,7 @@ export default function JobTestPage() {
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={!photoUrl || busy || !currentUser}
+              disabled={!photoUrl || busy}
               className="w-full rounded-full bg-gradient-to-r from-emerald-300 via-teal-200 to-slate-100 px-7 py-4 text-sm font-black uppercase tracking-[0.22em] text-slate-950 shadow-[0_0_34px_rgba(52,211,153,0.28)] transition enabled:hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-45"
             >
               {busy ? "Setting up job…" : "Submit async job"}
@@ -311,6 +320,12 @@ export default function JobTestPage() {
           </div>
         </div>
       </div>
+
+      <SignInSheet
+        isOpen={signInOpen}
+        onClose={() => setSignInOpen(false)}
+        onSuccess={() => { pendingResume.current?.(); pendingResume.current = null; }}
+      />
     </main>
   );
 }

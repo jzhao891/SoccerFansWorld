@@ -15,7 +15,7 @@ export default function MapMarkers() {
   const selectedTeam = useMapStore((s) => s.selectedTeam);
 
   const visiblePlaces = selectedTeam
-    ? mergedPlaces.filter((p) => p.fanZone?.watching_teams.includes(selectedTeam) ?? false)
+    ? mergedPlaces.filter((p) => p.fanZones?.some((fz) => fz.watching_teams?.includes(selectedTeam)) ?? false)
     : mergedPlaces;
 
   return (
