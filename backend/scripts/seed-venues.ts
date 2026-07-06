@@ -14,11 +14,6 @@ import { getAdminDb } from '../lib/admin';
 dotenv.config({ path: path.resolve(process.cwd(), 'backend/.env') });
 dotenv.config({ path: path.resolve(process.cwd(), 'apps/web/.env.local') });
 
-if (!process.env.SEED_OWNER_UID) {
-  console.error('Missing SEED_OWNER_UID in backend/.env — set it to your Firebase Auth uid.');
-  process.exit(1);
-}
-
 // ---- Logger (console + file) ----
 
 let logStream: fs.WriteStream | null = null;
@@ -275,6 +270,10 @@ async function main() {
 }
 
 if (require.main === module) {
+  if (!process.env.SEED_OWNER_UID) {
+    console.error('Missing SEED_OWNER_UID in backend/.env — set it to your Firebase Auth uid.');
+    process.exit(1);
+  }
   main().catch((err) => {
     log.error(String(err));
     process.exit(1);

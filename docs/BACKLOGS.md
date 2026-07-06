@@ -66,8 +66,6 @@
 
 - **Match info:** Display match info (e.g. dates, teams, live stats) on the main page or map page to give users soccer context alongside venue data.
 
-- **Fan zone expiry sweep:** Separate scheduled sweep that retires past events so the `venues` collection doesn't accumulate stale docs. Treat an event as complete when `end_time ?? (start_time + ~3h default window) < now`; after a grace period, deactivate (`is_active: false`) or delete it. Runs independently of the moderation sweep via the Admin SDK (bypasses rules; client deletes stay locked). `end_time` is optional and only sharpens the estimate.
-
 - **Venue/event deletion flow (user-initiated):** Let users delete their own fan zones/events from the UI. **Pre-req: Auth flow** — deletion must be owner-scoped (`allow delete: if request.auth != null && resource.data.created_by == request.auth.uid`), which requires a signed-in identity. Without auth there's no way to identify the owner, so client deletes can't be allowed safely (anyone could delete anything) — which is why the interim security rules lock client deletes entirely. Distinct from the background expiry/cleanup deletion, which runs via the Admin SDK and is not user-initiated.
 
 - **Cost controls — remaining items (budget alert DONE):** Cost spans **three independent billing surfaces**; here's the state of each.

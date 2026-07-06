@@ -22,13 +22,18 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
  * Uses the Admin SDK (bypasses security rules, which lock client deletes).
  */
 
-const DEFAULT_DURATION_MS = 3 * 60 * 60 * 1000; // 3h assumed duration when end_time absent
-const GRACE_MS = 2 * 60 * 60 * 1000;            // 2h grace after computed end
+export const DEFAULT_DURATION_MS = 3 * 60 * 60 * 1000; // 3h assumed duration when end_time absent
+export const GRACE_MS = 2 * 60 * 60 * 1000;            // 2h grace after computed end
 
-function effectiveEndMs(data: Record<string, unknown>): number | null {
+export function effectiveEndMs(data: Record<string, unknown>): number | null {
   if (typeof data.end_time === 'number') return data.end_time;
   if (typeof data.start_time === 'number') return data.start_time + DEFAULT_DURATION_MS;
   return null;
+}
+
+export function isExpired(data: Record<string, unknown>, now: number): boolean {
+  const end = effectiveEndMs(data);
+  return end !== null && now > end + GRACE_MS;
 }
 
 function formatTime(ms: number): string {
@@ -90,7 +95,9 @@ async function main() {
   process.exit(0);
 }
 
-main().catch((e) => {
-  console.error(e instanceof Error ? e.message : e);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((e) => {
+    console.error(e instanceof Error ? e.message : e);
+    process.exit(1);
+  });
+}
