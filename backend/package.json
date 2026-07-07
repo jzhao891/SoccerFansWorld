@@ -9,11 +9,13 @@
     "count": "tsx scripts/count-venues.ts",
     "cleanup-dupes": "tsx scripts/cleanup-dupes.ts",
     "activation-sweep": "tsx sweepers/venue-activation-sweeper.ts",
-    "expiry-sweep": "tsx sweepers/venue-expiry-sweeper.ts"
+    "expiry-sweep": "tsx sweepers/venue-expiry-sweeper.ts",
+    "crawl:url": "tsx venue-seeder/crawl-url.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
     "@sfw/shared": "*",
+    "cheerio": "^1.2.0",
     "firebase": "^12.14.0",
     "firebase-admin": "^14.0.0",
     "geofire-common": "^6.0.0"

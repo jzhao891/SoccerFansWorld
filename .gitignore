@@ -40,6 +40,9 @@ ONETIME_SETUP.md
 # venue seed data (contains Google Places IDs — keep local only)
 backend/resources/venues*.json
 
+# venue-seeder crawl inputs + state (local only — never commit)
+backend/venue-seeder/resources/
+
 # Firebase Admin SDK service-account key — SECRET, NEVER commit
 serviceAccountKey.json
 *serviceAccount*.json
