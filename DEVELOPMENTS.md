@@ -245,3 +245,32 @@ Prints the total number of `venues` documents in Firestore, broken down by venue
 
 - **Skipped venues**: team name failed validation — fix spelling in `venues.json` and re-run.
 - **Potential duplicates**: an existing Firestore doc matched both the same calendar day and overlapping `watching_teams`. Review the logged side-by-side diff. If it is a genuinely different event, set `"skip_dedupe_check": true` on that event in `venues.json` and re-run.
+
+## Venue Sweepers
+
+### Activation sweeper
+
+Scans `INACTIVE` venues, runs structural + LLM content validation, and flips passing docs to `ACTIVE`. Run from repo root.
+
+```bash
+# Dry run — report only, no writes
+npx tsx backend/sweepers/venue-activation-sweeper.ts
+
+# Apply — write ACTIVE / REJECTED
+npx tsx backend/sweepers/venue-activation-sweeper.ts --apply
+
+# Structural gate only (no LLM, no API key needed)
+npx tsx backend/sweepers/venue-activation-sweeper.ts --apply --no-llm
+```
+
+### Expiry sweeper
+
+Deletes past events so the collection stays clean. A venue is expired when `now > (end_time ?? start_time + 3h) + 2h grace`. Venues with no time info are skipped. Run from repo root.
+
+```bash
+# Dry run — log what would be deleted, no writes
+npx tsx backend/sweepers/venue-expiry-sweeper.ts
+
+# Apply — permanently delete expired venues
+npx tsx backend/sweepers/venue-expiry-sweeper.ts --apply
+```

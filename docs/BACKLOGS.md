@@ -6,6 +6,20 @@
 
 - **Firestore security rules:** Currently all Firestore reads and writes are open. Add proper security rules: `live_statuses` and `venues` should require Auth for writes; read access can remain open. Watch party creation (`venues` collection) should only allow writes from authenticated users and enforce that `created_by` matches the requesting user's UID. Consider rate-limiting rules to prevent abuse.
 
+- **Complete venue seeding pipeline — add crawler stage:** The seed pipeline currently has two of three stages: (2) LLM normalization (`seed-venues.ts`) and (3) Firestore write. Stage (1) — automated discovery — is missing. Build a crawler that finds World Cup 2026 watch-party events from public sources (city fan-zone pages, venue websites, host-committee listings, Eventbrite/Meetup searches) and outputs a `venues.json`-compatible payload for stage 2. Subtasks:
+  - **[design]** Identify target sources per host city (Seattle, NYC, LA, Dallas, SF, KC, Miami, Atlanta, Boston, Philadelphia). Prioritize official FIFA/city fan-zone pages and high-signal event aggregators.
+  - **[code]** `backend/crawlers/venue-crawler.ts` — HTTP fetch + HTML parse (Cheerio or Playwright for JS-rendered pages); extract venue name, address, event title, date/time, teams, URL per listing.
+  - **[code]** Pipe crawler output through the existing LLM normalization step (`lib/llm.ts`) to produce validated `SeedVenue[]` — reuse the team-name validation and schema enforcement already in `seed-venues.ts`.
+  - **[code]** Wire into a `npm run crawl` script in `backend/package.json`; optionally chain directly into `npm run seed` for a single-command ingest.
+  - **[ops]** Schedule as a nightly cron (Cloud Scheduler → Cloud Run or a simple cron on a VPS) so new events auto-populate without manual runs.
+
+- **Automatic advertisement:** Automatically promote FandarAI and newly added fan zones across channels to drive discovery and sign-ups. Subtasks:
+  - **[social · X/Twitter]** Auto-post when a new fan zone goes ACTIVE: "🏟️ New watch party added in [City] — [event_title] at [name]. Find it on fandar.ai #FIFAWorldCup2026". Use the X API v2 (`POST /2/tweets`) with an app-level bearer token stored in `backend/.env`.
+  - **[social · Instagram/Threads]** Queue a card-image post (use the existing fan-card compositor in `apps/web/lib/compose/`) per new fan zone batch. Threads API or Buffer/Zapier integration.
+  - **[email · waitlist/digest]** Weekly digest email to signed-up users listing new fan zones near their last known city. Resend or SendGrid, triggered by a backend cron.
+  - **[SEO]** Generate static city landing pages (`/seattle`, `/nyc`, etc.) listing active fan zones — makes FandarAI indexable and drives organic search traffic for "World Cup 2026 watch party [city]".
+  - **[ops]** Track performance (clicks, sign-ups, fan-zone opens) per channel using UTM params + a simple Firestore `ad_events` collection or a Plausible/PostHog event.
+
 - **Mapbox token URL allowlist:** The `NEXT_PUBLIC_MAPBOX_TOKEN` is visible in the browser bundle. Restrict it to your domain in the Mapbox dashboard (Account → Access tokens → edit token → Allowed URLs) so it can't be used on other sites. Add both the Vercel preview URL and the custom domain once set up.
 
 - **Apple Sign in with Apple — complete Service ID configuration:** Blocked until the iOS App ID (bundle ID) is registered. See `INFRASTRUCTURES.md` → Firebase Auth → Step 4 for the exact steps to complete.
@@ -32,6 +46,12 @@
   - **[prereq · EAS]** dev-client rebuild (`npx eas build --profile development`) — native modules require it; the new auth can't run/test until then.
   - **[finalize]** test Google/Apple/Email + gated create + forgot-password + persistence on device, then enable the deferred venue create-auth rule (`request.auth != null && created_by == request.auth.uid`) — closes the create-auth half of #22 once both platforms authenticate.
 
+- **Mobile check-in + RSVP — enable UI:** The shared layer is fully ready (types, aggregation, `useVenueCheckins`, `writeCheckIn`/`removeCheckIn`, `writeRsvp`/`removeRsvp`, Firestore rules). **Pre-req: mobile auth above** — check-ins and RSVPs require a signed-in `uid`. Once auth lands, the mobile work is:
+  - **[code]** Wire `useVenueCheckins(eventId, startTime)` into `apps/mobile/components/VenueDrawer.tsx` (mirroring `EventCard.tsx` on web): vibe pills (Chill / Buzzing / Packed), optional big-screen + sound binaries, RSVP button + count, "Clear my check-in" link.
+  - **[code]** Show vibe badge beside venue name in the drawer header (mirrors `VibeBadges` on web).
+  - **[code]** Gate check-in/RSVP writes behind sign-in (same `withAuth` pattern as web — open `SignInSheet` if no uid, resume after success).
+  - **[finalize]** Verify live vibe aggregation and RSVP count update in real time on device.
+
 - **LLM-powered venue creation from URL or text prompt:** Allow admins or users to paste an event URL or raw text description. An LLM parses the input and extracts structured FanZone fields (name, address, event_title, start_time, end_time, watching_teams, amenities, organizer, url, description). For seeding: bulk-generate many docs from a single schedule page (e.g. a venue hosting 30+ World Cup watch parties). For users: pre-fill the creation form for review and confirmation before submitting to Firestore.
 
 - **Automated venue ingestion pipeline:** Unattended backend pipeline (scheduled/cron) that (1) crawls public internet sources — city / host-committee event pages, venue sites, fan-zone listings — for World Cup watch-party events; (2) uses an LLM to normalize each into the `venues.json` schema (validated team names, ISO start/end times with offsets, admission, amenities, organizers, url); (3) runs the existing `seed-venues.ts` writer to upsert into Firestore (reusing its Places lookup, geohash, validation, and dedupe). Distinct from the user-facing "LLM venue creation from URL/text" feature above — this is a bulk discovery-and-ingestion job, not a form helper. The current seed script is only stage 3; this item adds the crawl + LLM-extraction stages in front of it.
@@ -45,8 +65,6 @@
 - **Check-in trust model (Option A — voting with decay):** Replace the current last-write-wins check-in with an aggregated voting system. Store individual check-ins as timestamped votes in a `check_ins` subcollection under each venue. Compute `crowd_index` and `sound` from votes within a rolling time window (e.g. last 30 min), weighted so recent votes count more and old votes expire. The `live_statuses` doc becomes a computed summary rather than a direct user write. Requires either Firebase Cloud Functions for server-side aggregation or client-side recomputation on each check-in.
 
 - **Match info:** Display match info (e.g. dates, teams, live stats) on the main page or map page to give users soccer context alongside venue data.
-
-- **Fan zone expiry sweep:** Separate scheduled sweep that retires past events so the `venues` collection doesn't accumulate stale docs. Treat an event as complete when `end_time ?? (start_time + ~3h default window) < now`; after a grace period, deactivate (`is_active: false`) or delete it. Runs independently of the moderation sweep via the Admin SDK (bypasses rules; client deletes stay locked). `end_time` is optional and only sharpens the estimate.
 
 - **Venue/event deletion flow (user-initiated):** Let users delete their own fan zones/events from the UI. **Pre-req: Auth flow** — deletion must be owner-scoped (`allow delete: if request.auth != null && resource.data.created_by == request.auth.uid`), which requires a signed-in identity. Without auth there's no way to identify the owner, so client deletes can't be allowed safely (anyone could delete anything) — which is why the interim security rules lock client deletes entirely. Distinct from the background expiry/cleanup deletion, which runs via the Admin SDK and is not user-initiated.
 
