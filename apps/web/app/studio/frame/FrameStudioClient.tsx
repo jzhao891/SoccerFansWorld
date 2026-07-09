@@ -373,7 +373,7 @@ export default function FrameStudioClient({ frames }: { frames: FrameTemplate[] 
               <div className="flex flex-col items-center gap-3">
                 {isInAppBrowser && (
                   <p className="max-w-xs text-center text-xs leading-5 text-amber-200">
-                    Saving doesn't work inside WeChat's browser. Tap “···” top-right → “Open in Browser” (在浏览器打开) first.
+                    Saving doesn&apos;t work inside WeChat&apos;s browser. Tap “···” top-right → “Open in Browser” (在浏览器打开) first.
                   </p>
                 )}
                 <button type="button" onClick={handleDownload} disabled={isDownloading}
