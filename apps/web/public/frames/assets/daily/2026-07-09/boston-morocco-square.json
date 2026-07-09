@@ -1,0 +1,15 @@
+{
+  "name": "Boston:Morocco Square",
+  "cutout": {
+    "x": 212,
+    "y": 189,
+    "w": 873,
+    "h": 909
+  },
+  "size": {
+    "w": 1254,
+    "h": 1254
+  },
+  "mask": "none",
+  "price": 499
+}

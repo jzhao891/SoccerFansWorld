@@ -5,7 +5,8 @@ import { composite, type CompositeLayer } from "../compose/compositor";
 import { watermarkSvg } from "../compose/watermark";
 import { textSvg } from "../compose/text";
 import { applyTierResolution, watermarkVisible } from "../compose/tier";
-import { getTemplate, resolveAssetSrc } from "./catalog";
+import { resolveAssetSrc } from "./catalog";
+import { getFrameTemplate } from "./loadFrames";
 
 // Server-only orchestrator: turns a FrameRenderRequest into a finished PNG by
 // resolving each template layer against the request (selected assets, uploaded
@@ -15,7 +16,11 @@ import { getTemplate, resolveAssetSrc } from "./catalog";
 const PUBLIC_DIR = join(process.cwd(), "public");
 
 async function readPublic(src: string): Promise<Buffer> {
-  return readFile(join(PUBLIC_DIR, src.replace(/^\/+/, "")));
+  // Dynamic frame asset URLs carry a `?v=<mtime>` cache-buster (see
+  // loadFrames.ts) — strip it before resolving to an on-disk path, it's not
+  // part of the real filename.
+  const path = src.split("?")[0];
+  return readFile(join(PUBLIC_DIR, path.replace(/^\/+/, "")));
 }
 
 function dataUrlToBuffer(dataUrl: string): Buffer {
@@ -63,7 +68,7 @@ async function toCompositeLayer(
 }
 
 export async function renderFrame(req: FrameRenderRequest): Promise<Buffer> {
-  const template = getTemplate(req.templateId);
+  const template = await getFrameTemplate(req.templateId);
   if (!template) throw new Error(`Unknown template: ${req.templateId}`);
   if (!req.photoDataUrl) throw new Error("Missing photo");
 

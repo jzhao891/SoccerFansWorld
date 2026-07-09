@@ -27,7 +27,10 @@ export async function POST(req: NextRequest) {
     const imageUrl = `data:image/png;base64,${png.toString("base64")}`;
     return NextResponse.json({ imageUrl });
   } catch (error) {
+    // Full error stays server-side only — the client shows a generic
+    // message rather than surfacing internals (stack traces, sharp/file
+    // errors, etc.) to the customer.
     console.error("Frame render error:", error);
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return NextResponse.json({ error: "Render failed" }, { status: 500 });
   }
 }

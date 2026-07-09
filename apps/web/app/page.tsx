@@ -104,7 +104,7 @@ export default function MapPage() {
   }
 
   return (
-    <main className="w-screen h-screen relative bg-gray-200">
+    <main className="w-screen h-dvh relative bg-gray-200">
       <MapTopBar />
       <ProfileAvatar onRequestAuth={() => openSignIn()} onOpenProfile={() => setProfileOpen(true)} />
       <MapView onBoundsChange={handleBoundsChange} onMapClick={handleMapClick}>
@@ -161,13 +161,10 @@ export default function MapPage() {
       />
       <ProfileSheet isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
 
-      {/* Studio FAB — disabled for now */}
+      {/* Studio FAB — now routes to the photo frame studio */}
       <Link
-        href="/studio/card"
-        aria-disabled="true"
-        tabIndex={-1}
-        onClick={(e) => e.preventDefault()}
-        className="absolute bottom-6 left-6 z-10 flex items-center gap-2 px-4 py-3 rounded-full bg-black/30 backdrop-blur-md border border-white/10 text-white/50 text-sm font-medium shadow-lg pointer-events-none cursor-not-allowed"
+        href="/studio/frame"
+        className="absolute bottom-6 left-6 z-10 flex items-center gap-2 px-4 py-3 rounded-full bg-black/30 backdrop-blur-md border border-white/10 text-white text-sm font-medium shadow-lg hover:bg-black/40 transition-colors"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/>

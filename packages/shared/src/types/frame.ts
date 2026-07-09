@@ -76,6 +76,12 @@ export type AssetLayer = {
 export type OverlayLayer = {
   type: 'overlay';
   src: string;
+  // Optional smaller/compressed stand-in for `src`, used for the live camera
+  // preview (which only ever displays at a few hundred px) so the client
+  // isn't downloading a multi-MB full-resolution PNG just to show a border on
+  // screen. The server-side compositor always uses `src` for the final
+  // render — this never affects output quality.
+  previewSrc?: string;
   rect: Rect;
   fit: ImageFit;
 };

@@ -1,0 +1,15 @@
+{
+  "name": "Boston:France Square",
+  "cutout": {
+    "x": 328,
+    "y": 316,
+    "w": 1392,
+    "h": 1320
+  },
+  "size": {
+    "w": 2048,
+    "h": 2048
+  },
+  "mask": "none",
+  "price": 499
+}

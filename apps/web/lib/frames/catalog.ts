@@ -68,10 +68,10 @@ export const FRAME_TEMPLATES: FrameTemplate[] = [
       { dimension: "stadium", required: true },
       { dimension: "weather", required: false },
     ],
-    inputs: [
-      { id: "city", label: "City", placeholder: "Seattle", maxLength: 20 },
-      { id: "score", label: "Scoreline", placeholder: "2 - 1", maxLength: 12 },
-    ],
+    // No text inputs — the studio UI has no field to fill "city"/"score"
+    // (that picker was removed along with the scene picker), so a
+    // TextInputField with nothing to drive it just clutters the template.
+    inputs: [],
     layers: [
       // Background stadium (customer picks day/night)
       { type: "asset", source: "stadium", rect: { x: 0, y: 0, w: 1080, h: 1350 }, fit: "cover" },
@@ -81,24 +81,16 @@ export const FRAME_TEMPLATES: FrameTemplate[] = [
       { type: "photo", rect: { x: 140, y: 250, w: 800, h: 800 }, fit: "cover", mask: "rounded" },
       // Static decorative frame border (template-owned)
       { type: "overlay", src: "/frames/assets/border-classic.svg", rect: { x: 0, y: 0, w: 1080, h: 1350 }, fit: "fill" },
-      // City line
-      {
-        type: "text",
-        bind: { kind: "input", field: "city" },
-        rect: { x: 90, y: 1110, w: 900, h: 96 },
-        style: { fontFamily: "Arial, sans-serif", fontSize: 66, color: "#ffffff", weight: 800, align: "center", uppercase: true, letterSpacing: 4 },
-      },
-      // Scoreline
-      {
-        type: "text",
-        bind: { kind: "input", field: "score" },
-        rect: { x: 90, y: 1208, w: 900, h: 72 },
-        style: { fontFamily: "Arial, sans-serif", fontSize: 46, color: "#7CF6C9", weight: 700, align: "center", letterSpacing: 2 },
-      },
       // Free-tier watermark (skipped on hd by the renderer)
       { type: "watermark" },
     ],
   },
+  // Illustrated (generated-art) frames are NOT hardcoded here — they're
+  // scanned dynamically from public/frames/assets/{general,daily/<date>}/
+  // by lib/frames/loadFrames.ts (server-only). This array stays reserved for
+  // parametric templates like the one above (swappable backgrounds/text),
+  // which a directory of flat PNGs can't express. See tools/finalize-frame.mjs
+  // for how an illustrated frame gets added.
 ];
 
 export function getTemplate(id: string): FrameTemplate | undefined {
