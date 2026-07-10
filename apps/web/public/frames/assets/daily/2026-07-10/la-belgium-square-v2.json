@@ -1,10 +1,10 @@
 {
-  "name": "SF:Spain Square V2",
+  "name": "LA:Belgium Square V2",
   "cutout": {
-    "x": 364,
-    "y": 349,
-    "w": 1319,
-    "h": 1288
+    "x": 410,
+    "y": 434,
+    "w": 1206,
+    "h": 1203
   },
   "size": {
     "w": 2048,
