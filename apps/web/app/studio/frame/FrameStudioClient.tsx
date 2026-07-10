@@ -142,8 +142,6 @@ export default function FrameStudioClient({ frames }: { frames: FrameTemplate[] 
     void handleGenerate(dataUrl);
   }
 
-  const canRender = Boolean(photoUrl);
-
   function resetPreview() { setPreviewUrl(""); }
 
   function pickFrame(next: FrameTemplate) {
@@ -344,11 +342,6 @@ export default function FrameStudioClient({ frames }: { frames: FrameTemplate[] 
                 </div>
               )}
               <canvas ref={canvasRef} className="hidden" />
-
-              <button type="button" onClick={() => handleGenerate()} disabled={!canRender || isRendering}
-                className="w-full rounded-full bg-gradient-to-r from-emerald-300 via-teal-200 to-slate-100 px-7 py-4 text-sm font-black uppercase tracking-[0.22em] text-slate-950 shadow-[0_0_34px_rgba(52,211,153,0.28)] transition enabled:hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-45">
-                {isRendering ? "Compositing…" : "Generate Frame"}
-              </button>
             </div>
           </div>
 
