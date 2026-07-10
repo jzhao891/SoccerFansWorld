@@ -1,0 +1,15 @@
+{
+  "name": "SF:Belgium Square V2",
+  "cutout": {
+    "x": 410,
+    "y": 434,
+    "w": 1206,
+    "h": 1203
+  },
+  "size": {
+    "w": 2048,
+    "h": 2048
+  },
+  "mask": "none",
+  "price": 499
+}
