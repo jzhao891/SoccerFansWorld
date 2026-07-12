@@ -2,18 +2,15 @@ import * as path from 'path';
 import * as fs from 'fs';
 import type { SeedVenue, SeedEvent } from '../scripts/seed-venues';
 
+const OUTPUT_FILENAME = 'step2and3-venues.json';
+
 const RESOURCES = path.resolve(process.cwd(), 'backend/venue-seeder/resources');
-const OUTPUT_FILE = path.join(RESOURCES, 'venues.json');
+const OUTPUT_FILE = path.join(RESOURCES, OUTPUT_FILENAME);
 
-function main() {
-  if (!fs.existsSync(OUTPUT_FILE)) {
-    console.error(`venues.json not found at ${OUTPUT_FILE}. Run crawl first.`);
-    process.exit(1);
-  }
-
-  const venues: SeedVenue[] = JSON.parse(fs.readFileSync(OUTPUT_FILE, 'utf-8'));
-  const now = Date.now();
-
+export function filterStaleEvents(
+  venues: SeedVenue[],
+  now: number = Date.now(),
+): { filtered: SeedVenue[]; removedEvents: number; removedVenues: number } {
   let removedEvents = 0;
   let removedVenues = 0;
 
@@ -48,11 +45,31 @@ function main() {
       return true;
     });
 
-  fs.writeFileSync(OUTPUT_FILE, JSON.stringify(filtered, null, 2));
+  return { filtered, removedEvents, removedVenues };
+}
+
+export function run(resourcesDir: string): void {
+  const outputFile = path.join(resourcesDir, OUTPUT_FILENAME);
+
+  if (!fs.existsSync(outputFile)) {
+    throw new Error(`step2and3-venues.json not found at ${outputFile}. Run step1-crawl-url.ts and step2-judge-and-extract.ts first.`);
+  }
+
+  const venues: SeedVenue[] = JSON.parse(fs.readFileSync(outputFile, 'utf-8'));
+  const { filtered, removedEvents, removedVenues } = filterStaleEvents(venues);
+
+  fs.writeFileSync(outputFile, JSON.stringify(filtered, null, 2));
 
   console.log(`\nDone — removed ${removedEvents} past event(s), ${removedVenues} empty venue(s).`);
-  console.log(`${filtered.length} venue(s) remaining in venues.json.`);
+  console.log(`${filtered.length} venue(s) remaining in step2and3-venues.json.`);
   console.log('Run: npx tsx backend/scripts/seed-venues.ts');
 }
 
-main();
+if (require.main === module) {
+  try {
+    run(RESOURCES);
+  } catch (e) {
+    console.error(e instanceof Error ? e.message : e);
+    process.exit(1);
+  }
+}

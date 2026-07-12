@@ -10,8 +10,9 @@
     "cleanup-dupes": "tsx scripts/cleanup-dupes.ts",
     "activation-sweep": "tsx sweepers/venue-activation-sweeper.ts",
     "expiry-sweep": "tsx sweepers/venue-expiry-sweeper.ts",
-    "crawl:url": "tsx venue-seeder/crawl-url.ts",
-    "crawl:post-process": "tsx venue-seeder/post-process.ts"
+    "crawl:url": "tsx venue-seeder/step1-crawl-url.ts",
+    "crawl:judge-extract": "tsx venue-seeder/step2-judge-and-extract.ts",
+    "crawl:post-process": "tsx venue-seeder/step3-post-process.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
