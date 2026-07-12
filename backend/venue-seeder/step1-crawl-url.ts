@@ -69,10 +69,37 @@ export function appendFetchedPages(pages: FetchedPage[], file: string = FETCHED_
   fs.writeFileSync(file, JSON.stringify([...existing, ...pages], null, 2));
 }
 
+// Many event/calendar pages (e.g. Tockify) render their real content client-side,
+// leaving almost no visible body text in the server-delivered HTML — but still
+// embed a Schema.org <script type="application/ld+json"> block server-side with
+// the actual structured event data (name, startDate, endDate, location). Pull
+// that out before stripping scripts, since it's more reliable than prose for
+// dates anyway (exact ISO timestamps, no LLM guessing required).
+export function extractJsonLd(html: string): Record<string, unknown>[] {
+  const $ = cheerio.load(html);
+  const blocks: Record<string, unknown>[] = [];
+  $('script[type="application/ld+json"]').each((_, el) => {
+    try {
+      const parsed = JSON.parse($(el).contents().text());
+      blocks.push(...(Array.isArray(parsed) ? parsed : [parsed]));
+    } catch {
+      // Malformed JSON-LD — skip it, the rest of the page text is still used.
+    }
+  });
+  return blocks;
+}
+
 export function stripHtml(html: string): string {
+  const jsonLdBlocks = extractJsonLd(html);
+
   const $ = cheerio.load(html);
   $('script, style, nav, header, footer, noscript, iframe').remove();
-  return $('body').text().replace(/\s+/g, ' ').trim();
+  const bodyText = $('body').text().replace(/\s+/g, ' ').trim();
+
+  if (jsonLdBlocks.length === 0) return bodyText;
+
+  const jsonLdText = `STRUCTURED EVENT DATA (JSON-LD, authoritative — prefer these dates over prose):\n${jsonLdBlocks.map((b) => JSON.stringify(b)).join('\n')}`;
+  return [jsonLdText, bodyText].filter(Boolean).join('\n\n');
 }
 
 async function fetchText(url: string): Promise<string | null> {
@@ -88,7 +115,7 @@ async function fetchText(url: string): Promise<string | null> {
     const html = await res.text();
     const text = stripHtml(html);
     if (text.length < MIN_TEXT_LENGTH) {
-      console.log(`  [skip] Too short (${text.length} chars, likely JS-rendered): ${url}`);
+      console.log(`  [skip] Too short (${text.length} chars — no usable body text or JSON-LD found): ${url}`);
       return null;
     }
     return text;

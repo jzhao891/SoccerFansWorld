@@ -9,7 +9,7 @@ dotenv.config({ path: path.resolve(process.cwd(), 'backend/.env') });
 dotenv.config({ path: path.resolve(process.cwd(), 'apps/web/.env.local') });
 
 const FETCHED_FILENAME = 'step1and2-fetched-pages.json';
-const OUTPUT_FILENAME = 'step2and3-venues.json';
+const OUTPUT_FILENAME = 'step2-venues.json';
 const JUDGMENTS_FILENAME = 'step2-judgements.json';
 
 const RESOURCES = path.resolve(process.cwd(), 'backend/venue-seeder/resources');
@@ -25,7 +25,7 @@ export function appendVenues(venues: SeedVenue[], file: string = OUTPUT_FILE) {
 }
 
 // The raw judgeAndExtractVenues() result, unmodified, so rejected venues stay
-// inspectable even though they never appear in step2and3-venues.json.
+// inspectable even though they never appear in step2-venues.json.
 export function appendJudgments(result: JudgeAndExtractResult, file: string = JUDGMENTS_FILE) {
   const existing: JudgeAndExtractResult[] = fs.existsSync(file)
     ? JSON.parse(fs.readFileSync(file, 'utf-8'))
@@ -68,7 +68,7 @@ export async function run(resourcesDir: string): Promise<void> {
   }
 
   console.log(`Judgment reasoning saved to ${judgmentsFile}`);
-  console.log('Review step2and3-venues.json then run: npx tsx backend/venue-seeder/step3-post-process.ts');
+  console.log('Run: npx tsx backend/venue-seeder/step3-post-process.ts');
 }
 
 if (require.main === module) {

@@ -19,7 +19,7 @@ describe('appendVenues', () => {
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'judge-and-extract-test-'));
-    tmpFile = path.join(tmpDir, 'step2and3-venues.json');
+    tmpFile = path.join(tmpDir, 'step2-venues.json');
   });
 
   afterEach(() => {

@@ -4,6 +4,7 @@ import * as os from 'os';
 import * as path from 'path';
 import {
   stripHtml,
+  extractJsonLd,
   loadUrls,
   loadProcessed,
   saveProcessed,
@@ -90,6 +91,74 @@ describe('stripHtml', () => {
 
   it('returns empty string for empty body', () => {
     expect(stripHtml('<html><body></body></html>')).toBe('');
+  });
+
+  it('includes JSON-LD structured data even when body text is otherwise empty', () => {
+    const html = `<html><head>
+      <script type="application/ld+json">{"@type":"Event","name":"Semi-Final Watch Party","startDate":"2026-07-14T10:00:00-07:00"}</script>
+    </head><body></body></html>`;
+    const result = stripHtml(html);
+    expect(result).toContain('Semi-Final Watch Party');
+    expect(result).toContain('2026-07-14T10:00:00-07:00');
+  });
+
+  it('combines JSON-LD data with regular body text', () => {
+    const html = `<html><head>
+      <script type="application/ld+json">{"@type":"Event","startDate":"2026-07-14T10:00:00-07:00"}</script>
+    </head><body><p>Join us at The Pub.</p></body></html>`;
+    const result = stripHtml(html);
+    expect(result).toContain('2026-07-14T10:00:00-07:00');
+    expect(result).toContain('Join us at The Pub.');
+  });
+
+  it('does not treat a plain (non-JSON-LD) script tag as structured data', () => {
+    const html = '<body><script>alert("xss")</script><p>Hello</p></body>';
+    const result = stripHtml(html);
+    expect(result).not.toContain('alert');
+    expect(result).toBe('Hello');
+  });
+});
+
+// ---- extractJsonLd ----
+
+describe('extractJsonLd', () => {
+  it('parses a single JSON-LD block', () => {
+    const html = '<script type="application/ld+json">{"@type":"Event","name":"Test Event"}</script>';
+    expect(extractJsonLd(html)).toEqual([{ '@type': 'Event', name: 'Test Event' }]);
+  });
+
+  it('flattens an array-form JSON-LD block', () => {
+    const html = '<script type="application/ld+json">[{"@type":"Event","name":"A"},{"@type":"Place","name":"B"}]</script>';
+    expect(extractJsonLd(html)).toEqual([
+      { '@type': 'Event', name: 'A' },
+      { '@type': 'Place', name: 'B' },
+    ]);
+  });
+
+  it('collects multiple separate JSON-LD script tags', () => {
+    const html = `
+      <script type="application/ld+json">{"@type":"Event","name":"A"}</script>
+      <script type="application/ld+json">{"@type":"Place","name":"B"}</script>
+    `;
+    expect(extractJsonLd(html)).toEqual([
+      { '@type': 'Event', name: 'A' },
+      { '@type': 'Place', name: 'B' },
+    ]);
+  });
+
+  it('skips malformed JSON-LD without throwing', () => {
+    const html = '<script type="application/ld+json">{not valid json</script>';
+    expect(extractJsonLd(html)).toEqual([]);
+  });
+
+  it('returns an empty array when there is no JSON-LD', () => {
+    const html = '<body><p>Hello</p></body>';
+    expect(extractJsonLd(html)).toEqual([]);
+  });
+
+  it('ignores plain script tags without the ld+json type', () => {
+    const html = '<script>{"@type":"Event"}</script>';
+    expect(extractJsonLd(html)).toEqual([]);
   });
 });
 

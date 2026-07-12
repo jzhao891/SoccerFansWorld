@@ -16,6 +16,7 @@ vi.mock('@anthropic-ai/sdk', () => ({
 import { run as runCrawl } from '../../venue-seeder/step1-crawl-url';
 import { run as runJudgeAndExtract } from '../../venue-seeder/step2-judge-and-extract';
 import { run as runPostProcess } from '../../venue-seeder/step3-post-process';
+import { validateVenues } from '../../scripts/seed-venues';
 
 const HTML_PAGE = (label: string) =>
   `<html><body><h1>${label}</h1><p>${'Watch party details. '.repeat(30)}</p></body></html>`;
@@ -37,7 +38,7 @@ describe('venue-seeder pipeline (step1 -> step2 -> step3)', () => {
     vi.unstubAllGlobals();
   });
 
-  it('carries a future-dated venue through to step2and3-venues.json and drops a past-dated one', async () => {
+  it('carries a future-dated venue through to step3-venues.json and drops a past-dated one', async () => {
     fs.writeFileSync(
       path.join(tmpDir, 'crawl-urls.txt'),
       [
@@ -118,14 +119,27 @@ describe('venue-seeder pipeline (step1 -> step2 -> step3)', () => {
       'Random Blog Mention',
     );
 
-    // step3: past-dated venue pruned, future-dated venue survives
-    const venues = JSON.parse(fs.readFileSync(path.join(tmpDir, 'step2and3-venues.json'), 'utf-8'));
-    expect(venues).toHaveLength(1);
-    expect(venues[0].venue_name).toBe('Future Venue');
-    expect(venues[0].events).toHaveLength(1);
+    // step2's own output is untouched by step3 — both venues still present there
+    const step2Venues = JSON.parse(fs.readFileSync(path.join(tmpDir, 'step2-venues.json'), 'utf-8'));
+    expect(step2Venues.map((v: { venue_name: string }) => v.venue_name).sort()).toEqual([
+      'Future Venue',
+      'Past Venue',
+    ]);
+
+    // step3: past-dated venue pruned, future-dated venue survives, written to its own file
+    const step3Venues = JSON.parse(fs.readFileSync(path.join(tmpDir, 'step3-venues.json'), 'utf-8'));
+    expect(step3Venues).toHaveLength(1);
+    expect(step3Venues[0].venue_name).toBe('Future Venue');
+    expect(step3Venues[0].events).toHaveLength(1);
+
+    // step3 -> step4 wiring: step3's output must be directly consumable by seed-venues.ts's
+    // own validation, without needing to mock Firestore/Google Places to prove compatibility.
+    const { valid, invalid } = validateVenues(step3Venues);
+    expect(valid).toHaveLength(1);
+    expect(invalid).toHaveLength(0);
   });
 
-  it('throws in step3 when step2and3-venues.json was never created', () => {
-    expect(() => runPostProcess(tmpDir)).toThrow('step2and3-venues.json not found');
+  it('throws in step3 when step2-venues.json was never created', () => {
+    expect(() => runPostProcess(tmpDir)).toThrow('step2-venues.json not found');
   });
 });

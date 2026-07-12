@@ -2,7 +2,8 @@ import * as path from 'path';
 import * as fs from 'fs';
 import type { SeedVenue, SeedEvent } from '../scripts/seed-venues';
 
-const OUTPUT_FILENAME = 'step2and3-venues.json';
+const INPUT_FILENAME = 'step2-venues.json';
+const OUTPUT_FILENAME = 'step3-venues.json';
 
 const RESOURCES = path.resolve(process.cwd(), 'backend/venue-seeder/resources');
 const OUTPUT_FILE = path.join(RESOURCES, OUTPUT_FILENAME);
@@ -49,19 +50,23 @@ export function filterStaleEvents(
 }
 
 export function run(resourcesDir: string): void {
+  const inputFile = path.join(resourcesDir, INPUT_FILENAME);
   const outputFile = path.join(resourcesDir, OUTPUT_FILENAME);
 
-  if (!fs.existsSync(outputFile)) {
-    throw new Error(`step2and3-venues.json not found at ${outputFile}. Run step1-crawl-url.ts and step2-judge-and-extract.ts first.`);
+  if (!fs.existsSync(inputFile)) {
+    throw new Error(`step2-venues.json not found at ${inputFile}. Run step1-crawl-url.ts and step2-judge-and-extract.ts first.`);
   }
 
-  const venues: SeedVenue[] = JSON.parse(fs.readFileSync(outputFile, 'utf-8'));
+  // Reads step2's raw output without mutating it, and always writes a fresh
+  // step3-venues.json — so re-running step3 is safe and reproducible from
+  // step2's untouched data, and nothing is ever destructively overwritten.
+  const venues: SeedVenue[] = JSON.parse(fs.readFileSync(inputFile, 'utf-8'));
   const { filtered, removedEvents, removedVenues } = filterStaleEvents(venues);
 
   fs.writeFileSync(outputFile, JSON.stringify(filtered, null, 2));
 
   console.log(`\nDone — removed ${removedEvents} past event(s), ${removedVenues} empty venue(s).`);
-  console.log(`${filtered.length} venue(s) remaining in step2and3-venues.json.`);
+  console.log(`${filtered.length} venue(s) remaining → written to ${outputFile}`);
   console.log('Run: npx tsx backend/scripts/seed-venues.ts');
 }
 
