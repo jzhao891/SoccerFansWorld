@@ -178,9 +178,9 @@ async function main() {
   createLogger(logPath);
   log.info(`Logging to ${logPath}\n`);
 
-  const venuesPath = path.resolve(process.cwd(), 'backend/resources/venues3.json');
+  const venuesPath = path.resolve(process.cwd(), 'backend/venue-seeder/resources/step3-venues.json');
   if (!fs.existsSync(venuesPath)) {
-    log.error(`venues.json not found at ${venuesPath}`);
+    log.error(`step3-venues.json not found at ${venuesPath}. Run step1-crawl-url.ts, step2-judge-and-extract.ts, and step3-post-process.ts first.`);
     process.exit(1);
   }
 
