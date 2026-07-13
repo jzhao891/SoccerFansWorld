@@ -1,47 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
-import { fal } from "@fal-ai/client";
-import { readFileSync } from "fs";
-import { join } from "path";
+import { NextResponse } from "next/server";
 
-export const runtime = "nodejs";
-
-/**
- * Upload an image to fal storage and return the public URL.
- *
- * Accepts one of:
- *   { base64: string, name: string, mimeType: string }  — user-uploaded image
- *   { publicPath: string }                              — file under /public served by this app
- */
-export async function POST(req: NextRequest) {
-  fal.config({ credentials: process.env.FAL_KEY! });
-
-  const body = await req.json() as {
-    base64?: string;
-    name?: string;
-    mimeType?: string;
-    publicPath?: string;
-  };
-
-  let file: File;
-
-  if (body.publicPath) {
-    // Serve a file from the Next.js public/ directory (not accessible to fal during local dev)
-    const safePath = body.publicPath.replace(/\.\./g, ""); // prevent path traversal
-    const abs = join(process.cwd(), "public", safePath);
-    const buf = readFileSync(abs);
-    const ext = safePath.split(".").pop()?.toLowerCase() ?? "png";
-    const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "image/png";
-    file = new File([buf], safePath.split("/").pop() ?? "file.png", { type: mime });
-  } else if (body.base64) {
-    const data = body.base64.replace(/^data:image\/\w+;base64,/, "");
-    const buf = Buffer.from(data, "base64");
-    const mime = (body.mimeType ?? "image/jpeg") as string;
-    const name = body.name ?? "upload.jpg";
-    file = new File([buf], name, { type: mime });
-  } else {
-    return NextResponse.json({ error: "Provide base64 or publicPath" }, { status: 400 });
-  }
-
-  const url = await fal.storage.upload(file);
-  return NextResponse.json({ url });
+// TEMPORARILY disabled: only used to upload images to fal.ai storage ahead
+// of a paid model call (face-swap etc.) — not needed for this deploy, and
+// its serverless function bundle exceeded Vercel's 250MB uncompressed limit
+// (see git history for this file, and next.config.ts's outputFileTracingExcludes
+// comment for the underlying cause). Restore the previous commit's version
+// once that's addressed.
+export async function POST() {
+  return NextResponse.json(
+    { error: "Image upload for model calls is temporarily unavailable." },
+    { status: 501 },
+  );
 }

@@ -1,33 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
-import type { RenderTier } from "@sfw/shared";
-import { renderCard } from "@/lib/card/render";
-import type { CardRenderRequest } from "@/lib/card/types";
+import { NextResponse } from "next/server";
 
-export const runtime = "nodejs"; // sharp needs the Node runtime
-
-export async function POST(req: NextRequest) {
-  try {
-    const body = (await req.json()) as Partial<CardRenderRequest>;
-    const { playerImage, name, team, city, overall, card, tier } = body;
-
-    if (!playerImage || !card) {
-      return NextResponse.json({ error: "Missing playerImage or card data" }, { status: 400 });
-    }
-
-    const png = await renderCard({
-      playerImage,
-      name: name ?? "",
-      team: team ?? "",
-      city: city ?? "",
-      overall: overall ?? 0,
-      card,
-      tier: (tier as RenderTier) ?? "free",
-    });
-
-    const imageUrl = `data:image/png;base64,${png.toString("base64")}`;
-    return NextResponse.json({ imageUrl });
-  } catch (error) {
-    console.error("Card render error:", error);
-    return NextResponse.json({ error: String(error) }, { status: 500 });
-  }
+// TEMPORARILY disabled: the real implementation (see `git log` for this
+// file) imports renderCard from @/lib/card/render, which pulls in `sharp`
+// and traces to a 339MB serverless function bundle on Vercel — over the
+// platform's 250MB uncompressed limit. Unrelated to the frame studio feature
+// this route was disabled to unblock. Restore the previous commit's version
+// once the traced dependency graph is fixed (or the project opts into
+// Vercel's large-functions beta).
+export async function POST() {
+  return NextResponse.json(
+    { error: "Card rendering is temporarily unavailable." },
+    { status: 501 },
+  );
 }

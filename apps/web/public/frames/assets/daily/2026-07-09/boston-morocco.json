@@ -1,0 +1,15 @@
+{
+  "name": "Boston:Morocco",
+  "cutout": {
+    "x": 178,
+    "y": 319,
+    "w": 585,
+    "h": 1051
+  },
+  "size": {
+    "w": 941,
+    "h": 1672
+  },
+  "mask": "none",
+  "price": 499
+}

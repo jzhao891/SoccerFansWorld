@@ -1,0 +1,15 @@
+{
+  "name": "LA:Spain Square",
+  "cutout": {
+    "x": 191,
+    "y": 206,
+    "w": 625,
+    "h": 656
+  },
+  "size": {
+    "w": 1024,
+    "h": 1024
+  },
+  "mask": "none",
+  "price": 499
+}
