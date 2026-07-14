@@ -101,15 +101,14 @@ async function findCutout(inputPath) {
     );
   }
 
-  // Rough box — used only to seed the flood-fill's bounds below. A single
-  // center-row/center-column cross scan is only as good as whatever border
-  // art happens to sit exactly on those two lines: a flag poking in at one
-  // particular height, for instance, understates the real hole on that one
-  // line even though every OTHER nearby line reaches much further. Take
-  // several parallel lines spanning the middle 60% of the shape and use the
-  // widest reach found on any of them — each line is still only as far as
-  // real non-white pixels allow (same trust level as a single cross scan),
-  // just no longer at the mercy of whichever one line happens to be sampled.
+  // Rough box, stage 1 — a handful of sample lines (5 parallel rows/columns
+  // spanning the middle 60%). Deliberately sparse: reliable across every
+  // frame processed so far specifically BECAUSE it doesn't chase a single
+  // stray column/row very far — a lone column that happens to run "white"
+  // in an unbroken line from the hole straight through a light-colored
+  // decoration well above it (an obelisk, a cloud) would otherwise drag the
+  // box out to wherever that line ends, even the canvas edge (confirmed
+  // live on the Argentina frame's obelisk, and on Mexico's stadium banner).
   let left = cx, right = cx, top = cy, bottom = cy;
   for (const f of [-0.3, -0.15, 0, 0.15, 0.3]) {
     const y = Math.max(0, Math.min(height - 1, Math.round(cy + f * height)));
@@ -126,6 +125,33 @@ async function findCutout(inputPath) {
       top = Math.min(top, t);
       bottom = Math.max(bottom, b);
     }
+  }
+
+  // Rough box, stage 2 — now that `left/top/right/bottom` is a trustworthy
+  // approximation, densely scan EVERY row/column instead of just 5 to catch
+  // genuinely jagged spikes (paint-splatter collision graphics, confetti)
+  // that the sparse sample missed by passing through the gaps between them.
+  // The walk is capped at a fixed distance beyond the stage-1 box, not a
+  // fraction of the canvas — real spikes are a short reach past an already-
+  // located hole (tens of px), whereas the false bridges stage 1 avoids are
+  // hundreds of px away. Scaling the cap with the stage-1 box size keeps it
+  // meaningful on both small and large source images.
+  const SPIKE_MARGIN = Math.round(0.03 * Math.min(width, height));
+  const spikeMinX = Math.max(0, left - SPIKE_MARGIN), spikeMaxX = Math.min(width - 1, right + SPIKE_MARGIN);
+  const spikeMinY = Math.max(0, top - SPIKE_MARGIN), spikeMaxY = Math.min(height - 1, bottom + SPIKE_MARGIN);
+  for (let y = spikeMinY; y <= spikeMaxY; y++) {
+    if (!isWhite(data, at(cx, y))) continue;
+    let l = cx; while (l > spikeMinX && isWhite(data, at(l - 1, y))) l--;
+    let r = cx; while (r < spikeMaxX && isWhite(data, at(r + 1, y))) r++;
+    left = Math.min(left, l);
+    right = Math.max(right, r);
+  }
+  for (let x = spikeMinX; x <= spikeMaxX; x++) {
+    if (!isWhite(data, at(x, cy))) continue;
+    let t = cy; while (t > spikeMinY && isWhite(data, at(x, t - 1))) t--;
+    let b = cy; while (b < spikeMaxY && isWhite(data, at(x, b + 1))) b++;
+    top = Math.min(top, t);
+    bottom = Math.max(bottom, b);
   }
 
   const bounds = {
@@ -148,15 +174,39 @@ async function findCutout(inputPath) {
     if (y < bounds.maxY && !mask[p + width] && isWhite(data, at(x, y + 1))) { mask[p + width] = 1; stack.push(p + width); }
   }
 
-  // The cutout IS the (multi-line) rough box — not the largest rectangle
-  // inscribed in `mask`. That was tried: it's guaranteed to never overhang
-  // past the true hole, but "guaranteed" comes from being conservative, and
-  // area-maximizing doesn't necessarily pick the tall/narrow shape a photo
-  // wants — it visibly shrinks the camera box on every frame, not just the
-  // one with the asymmetric protrusion (confirmed live, reverted). The
-  // multi-line rough box already fixes the original problem (one bad
-  // row/column no longer defines the whole rect) without that cost.
-  const cutout = { x: left, y: top, w: right - left, h: bottom - top };
+  // The cutout is the bounding box OF `mask` — not the multi-line rough box,
+  // and not the largest rectangle INSCRIBED in `mask` (tried before: that's
+  // guaranteed to never overhang, but shrinks the camera box on every frame,
+  // not just the one with an asymmetric protrusion — confirmed live,
+  // reverted).
+  //
+  // Some border art (paint-splatter collision graphics, confetti) has a
+  // genuinely jagged hole boundary — thin transparent spikes reaching well
+  // past what any handful of sampled scan lines will catch, since each spike
+  // is only a few pixels wide and most sample lines pass through the gaps
+  // between them. The rough box then undershoots the true opening, and the
+  // photo rect (a plain filled rectangle) doesn't reach far enough to back
+  // every spike the overlay's alpha reveals — the gap shows through as black.
+  //
+  // `mask` itself has none of that blind-spot problem (it's a real flood
+  // fill, not a sparse sample), so its bounding box is guaranteed to envelop
+  // every spike. It can extend into pixels that are still opaque art rather
+  // than true hole — harmless, since the overlay draws on top and hides
+  // whatever the photo shows there. And since mask ⊇ the rough box by
+  // construction (the rough box's own pixels seeded the flood fill), this is
+  // always ≥ the old rect, never smaller — no risk of the inscribed-rectangle
+  // regression.
+  let maskMinX = width, maskMaxX = -1, maskMinY = height, maskMaxY = -1;
+  for (let y = bounds.minY; y <= bounds.maxY; y++) {
+    for (let x = bounds.minX; x <= bounds.maxX; x++) {
+      if (!mask[y * width + x]) continue;
+      if (x < maskMinX) maskMinX = x;
+      if (x > maskMaxX) maskMaxX = x;
+      if (y < maskMinY) maskMinY = y;
+      if (y > maskMaxY) maskMaxY = y;
+    }
+  }
+  const cutout = { x: maskMinX, y: maskMinY, w: maskMaxX - maskMinX, h: maskMaxY - maskMinY };
 
   return { width, height, channels, mask, cutout };
 }
