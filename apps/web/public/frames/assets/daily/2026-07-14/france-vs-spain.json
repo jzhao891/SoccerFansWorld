@@ -1,0 +1,15 @@
+{
+  "name": "France VS Spain",
+  "cutout": {
+    "x": 272,
+    "y": 898,
+    "w": 991,
+    "h": 1122
+  },
+  "size": {
+    "w": 1536,
+    "h": 2752
+  },
+  "mask": "none",
+  "price": 499
+}
