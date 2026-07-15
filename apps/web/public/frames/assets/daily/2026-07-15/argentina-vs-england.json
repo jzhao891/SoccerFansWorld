@@ -1,0 +1,15 @@
+{
+  "name": "Argentina VS England",
+  "cutout": {
+    "x": 282,
+    "y": 734,
+    "w": 973,
+    "h": 1626
+  },
+  "size": {
+    "w": 1536,
+    "h": 2752
+  },
+  "mask": "none",
+  "price": 499
+}
