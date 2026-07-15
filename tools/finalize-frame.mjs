@@ -18,6 +18,13 @@
 //        --category general
 //   node tools/finalize-frame.mjs --in raw-frame.png --name "Boston:France" \
 //        --category daily --date 2026-07-09
+//
+// Some generation styles (painterly/photoreal prompts) come back with a
+// REAL alpha channel already punched — no white/checkerboard placeholder to
+// detect. Pass --pre-alpha to skip the whole white-detection/flood-fill path
+// and read the cutout directly from the existing alpha channel instead.
+//   node tools/finalize-frame.mjs --in raw-frame.png --name "Argentina VS England 2" \
+//        --category daily --date 2026-07-15 --pre-alpha
 
 import sharp from "sharp";
 import { writeFileSync, mkdirSync, copyFileSync, existsSync, renameSync } from "fs";
@@ -211,6 +218,54 @@ async function findCutout(inputPath) {
   return { width, height, channels, mask, cutout };
 }
 
+// For --pre-alpha inputs: the alpha channel IS the mask already, no need to
+// guess it from color. But taking the bounding box of every alpha<128 pixel
+// in the whole image is NOT safe here — some of these generations have
+// unrelated transparent bits elsewhere (a soft cloud edge dipping below the
+// threshold, a full-width fade/reflection bar along the bottom of the
+// canvas), and either one blows the bounding box out to the canvas edge
+// (confirmed live on the England frame — a stray cloud blob plus a bottom
+// fade bar stretched the cutout to x=0, full width). Flood fill from the
+// center instead, same as the white-detection path: only the connected
+// transparent region the center pixel is actually part of counts as the
+// hole, so a disconnected transparent element anywhere else is ignored
+// rather than corrupting the box.
+async function findCutoutFromRealAlpha(inputPath) {
+  const { data, info } = await sharp(inputPath).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width, height, channels } = info;
+  const cx = Math.floor(width / 2), cy = Math.floor(height / 2);
+  const alphaAt = (x, y) => data[(y * width + x) * channels + 3];
+  if (alphaAt(cx, cy) >= 128) {
+    throw new Error(
+      `Center pixel at (${cx},${cy}) isn't transparent (alpha=${alphaAt(cx, cy)}) — ` +
+        `--pre-alpha expects a real alpha channel already punched at the canvas center.`,
+    );
+  }
+  const mask = new Uint8Array(width * height);
+  const stack = [cy * width + cx];
+  mask[cy * width + cx] = 1;
+  while (stack.length) {
+    const p = stack.pop();
+    const x = p % width, y = (p / width) | 0;
+    if (x > 0 && !mask[p - 1] && alphaAt(x - 1, y) < 128) { mask[p - 1] = 1; stack.push(p - 1); }
+    if (x < width - 1 && !mask[p + 1] && alphaAt(x + 1, y) < 128) { mask[p + 1] = 1; stack.push(p + 1); }
+    if (y > 0 && !mask[p - width] && alphaAt(x, y - 1) < 128) { mask[p - width] = 1; stack.push(p - width); }
+    if (y < height - 1 && !mask[p + width] && alphaAt(x, y + 1) < 128) { mask[p + width] = 1; stack.push(p + width); }
+  }
+  let minX = width, maxX = -1, minY = height, maxY = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (!mask[y * width + x]) continue;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  const cutout = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+  return { width, height, channels, mask, cutout };
+}
+
 // macOS's default filesystem is case-insensitive but case-preserving: if
 // `--in` is e.g. "USA.png" and the slug wants "usa.png", those resolve to
 // the SAME dirent. A plain copyFileSync there silently no-ops the rename —
@@ -258,7 +313,9 @@ async function writePreviewVersion(rawMaskedBuf, outPath, { width, height }) {
     .toFile(outPath);
 }
 
-const { width, height, channels, mask, cutout } = await findCutout(a.in);
+const { width, height, channels, mask, cutout } = a["pre-alpha"]
+  ? await findCutoutFromRealAlpha(a.in)
+  : await findCutout(a.in);
 
 const pngOut = join(outDir, `${slug}.png`);
 const alphaOut = join(outDir, `${slug}-alpha.png`);
