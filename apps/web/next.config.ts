@@ -1,4 +1,23 @@
 import type { NextConfig } from "next";
+import { readdirSync } from "fs";
+import { join } from "path";
+
+// Matches lib/frames/loadFrames.ts's todayDate() — the app only ever reads
+// today's daily/<date> folder at runtime, so every OTHER date folder is
+// dead weight in the deployed function bundle. Computed once at build time;
+// a stale build serving a wrong "today" just means yesterday's excluded
+// folder stays excluded, not a functional bug (that folder was already
+// inactive in the picker).
+const today = new Date().toISOString().slice(0, 10);
+const dailyDir = join(__dirname, "public", "frames", "assets", "daily");
+let expiredDailyGlobs: string[] = [];
+try {
+  expiredDailyGlobs = readdirSync(dailyDir, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && e.name !== today)
+    .map((e) => `public/frames/assets/daily/${e.name}/**`);
+} catch {
+  // No daily/ folder yet (fresh checkout before any frame's been added) — nothing to exclude.
+}
 
 const nextConfig: NextConfig = {
   // @sfw/shared ships as raw TypeScript from the workspace, so Next must
@@ -17,8 +36,13 @@ const nextConfig: NextConfig = {
   // function limit). public/highlights/ (223MB, standalone video-compositing
   // output, not read by any API route) is the bulk of that; excluding it
   // keeps every function's traced public/ well under the limit.
+  //
+  // That alone stopped being enough once the daily/ frame archive itself
+  // grew past ~225MB (api/frames/render hit 251.84MB — every OTHER function
+  // was already fine). expiredDailyGlobs excludes every daily/<date> folder
+  // except today's, since none of the others are ever read again.
   outputFileTracingExcludes: {
-    "*": ["public/highlights/**"],
+    "*": ["public/highlights/**", ...expiredDailyGlobs],
   },
   webpack: (config) => {
     config.resolve.alias = {
