@@ -35,7 +35,7 @@ async function loadFolder(dir: string, publicPrefix: string, idPrefix: string): 
     const pngFile = `${slug}.png`;
     const alphaFile = `${slug}-alpha.png`;
     const previewFile = `${slug}-preview.webp`;
-    if (!files.includes(pngFile) || !files.includes(alphaFile)) continue; // incomplete triple — skip
+    if (!files.includes(alphaFile)) continue; // incomplete triple — skip
     const hasPreview = files.includes(previewFile); // older frames pre-date the preview step — fall back to the full alpha
 
     let manifest: FrameManifest;
@@ -52,8 +52,14 @@ async function loadFolder(dir: string, publicPrefix: string, idPrefix: string): 
     // showing the old image until the user manually clears cache. Stamping
     // the file's mtime onto the URL makes a content change a URL change,
     // which no cache can serve stale.
-    const [pngStat, alphaStat, previewStat] = await Promise.all([
-      stat(join(dir, pngFile)),
+    //
+    // Only alphaFile/previewFile are stat'd here — the plain thumbnail PNG
+    // is excluded from the serverless function's traced filesystem (see
+    // next.config.ts) since it's a client-only <img> asset never read via
+    // fs at runtime; a stat() on it would throw once excluded. finalize-frame.mjs
+    // always writes pngFile and alphaFile together, so alphaStat's mtime is
+    // an equally valid cache-bust token for both URLs.
+    const [alphaStat, previewStat] = await Promise.all([
       stat(join(dir, alphaFile)),
       hasPreview ? stat(join(dir, previewFile)) : Promise.resolve(null),
     ]);
@@ -62,7 +68,7 @@ async function loadFolder(dir: string, publicPrefix: string, idPrefix: string): 
       id: `${idPrefix}-${slug}`,
       name: manifest.name,
       size: manifest.size,
-      thumbnail: `${publicPrefix}/${pngFile}?v=${pngStat.mtimeMs}`,
+      thumbnail: `${publicPrefix}/${pngFile}?v=${alphaStat.mtimeMs}`,
       price: manifest.price ?? 499,
       dimensions: [],
       inputs: [],
