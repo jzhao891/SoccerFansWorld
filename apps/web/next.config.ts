@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 import { readdirSync } from "fs";
-import { join } from "path";
+import { join, relative, sep } from "path";
 
 // Matches lib/frames/loadFrames.ts's todayDate() — the app only ever reads
 // today's daily/<date> folder at runtime, so every OTHER date folder is
@@ -18,6 +18,33 @@ try {
 } catch {
   // No daily/ folder yet (fresh checkout before any frame's been added) — nothing to exclude.
 }
+
+// Every frame's plain <slug>.png is a client-only picker thumbnail — Next
+// serves it from the static public/ output regardless of function tracing,
+// and lib/frames/loadFrames.ts no longer touches it via fs at runtime (see
+// that file). Only <slug>-alpha.png is ever read server-side. Excluding
+// every non-alpha PNG under frames/assets (general/ + all daily/<date>/,
+// not just expired ones) is what actually keeps TODAY's active folder from
+// blowing the function past 250MB when its source art is high-res.
+function findThumbnailPngs(dir: string): string[] {
+  let out: string[] = [];
+  let entries: import("fs").Dirent[] = [];
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const e of entries) {
+    const full = join(dir, e.name);
+    if (e.isDirectory()) out = out.concat(findThumbnailPngs(full));
+    else if (e.isFile() && e.name.endsWith(".png") && !e.name.endsWith("-alpha.png")) out.push(full);
+  }
+  return out;
+}
+const publicDir = join(__dirname, "public");
+const thumbnailPngGlobs = findThumbnailPngs(join(publicDir, "frames", "assets")).map(
+  (p) => "public/" + relative(publicDir, p).split(sep).join("/"),
+);
 
 const nextConfig: NextConfig = {
   // @sfw/shared ships as raw TypeScript from the workspace, so Next must
@@ -42,7 +69,7 @@ const nextConfig: NextConfig = {
   // was already fine). expiredDailyGlobs excludes every daily/<date> folder
   // except today's, since none of the others are ever read again.
   outputFileTracingExcludes: {
-    "*": ["public/highlights/**", ...expiredDailyGlobs],
+    "*": ["public/highlights/**", ...expiredDailyGlobs, ...thumbnailPngGlobs],
   },
   webpack: (config) => {
     config.resolve.alias = {
