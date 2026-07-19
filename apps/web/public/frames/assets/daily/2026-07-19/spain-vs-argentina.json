@@ -1,0 +1,15 @@
+{
+  "name": "Spain VS Argentina",
+  "cutout": {
+    "x": 215,
+    "y": 343,
+    "w": 592,
+    "h": 736
+  },
+  "size": {
+    "w": 1024,
+    "h": 1536
+  },
+  "mask": "none",
+  "price": 499
+}

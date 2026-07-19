@@ -1,0 +1,15 @@
+{
+  "name": "Spain VS Argentina 2",
+  "cutout": {
+    "x": 213,
+    "y": 317,
+    "w": 595,
+    "h": 765
+  },
+  "size": {
+    "w": 1024,
+    "h": 1536
+  },
+  "mask": "none",
+  "price": 499
+}
