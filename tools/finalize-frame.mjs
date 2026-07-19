@@ -299,8 +299,18 @@ async function writeAlphaVersion(inputPath, outPath, { width, height, channels, 
   const buf = channels === 4
     ? await sharp(inputPath).raw().toBuffer()
     : await sharp(inputPath).ensureAlpha().raw().toBuffer();
+  // Force alpha from `mask` alone — 0 where it's the hole, 255 everywhere
+  // else — rather than only ever punching new transparency in. For a
+  // --pre-alpha input the source can have OTHER real-alpha transparent bits
+  // outside the hole (the same stray clouds/fade-bars the cutout's flood
+  // fill already excludes) that would otherwise pass through untouched into
+  // this output; the overlay then reveals them with nothing behind (no
+  // photo reaches there) — a floating black patch in the middle of the
+  // border art (confirmed live on a Spain vs Argentina frame). No-op for
+  // the white-detection path: those sources are `ensureAlpha()`'d to 255
+  // everywhere before this runs, so there's nothing to force.
   for (let i = 0; i < width * height; i++) {
-    if (mask[i]) buf[i * 4 + 3] = 0;
+    buf[i * 4 + 3] = mask[i] ? 0 : 255;
   }
   await sharp(buf, { raw: { width, height, channels: 4 } }).png().toFile(outPath);
   return buf;
